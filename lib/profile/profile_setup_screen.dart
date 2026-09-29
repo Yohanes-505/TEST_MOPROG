@@ -1,13 +1,11 @@
-import 'dart:typed_data';
-
 import 'package:bumble/constants/app_colors.dart';
 import 'package:bumble/constants/interest_options.dart';
 import 'package:bumble/controllers/profile_controller.dart';
-import 'package:bumble/home/home_screen.dart';
 import 'package:bumble/home/main_shell.dart';
 import 'package:bumble/models/profile_model.dart';
 import 'package:bumble/widgets/interest_selector.dart';
-import 'package:bumble/widgets/photo_picker_avatar.dart';
+import 'package:bumble/widgets/photo_grid_picker.dart';
+import 'package:bumble/services/profile_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -36,7 +34,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   int _step = 0;
   Gender? _gender;
   List<String> _interests = [];
-  Uint8List? _photoPreview;
 
   // Filter preferensi awal
   Gender? _prefGender;
@@ -134,12 +131,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       maxDistanceKm: _maxDistance.round(),
     );
 
-    Get.offAll(() => const MainShell());
-  }
+    await controller.loadProfile();
 
-  Future<void> _onPhotoPicked(Uint8List bytes, String ext) async {
-    setState(() => _photoPreview = bytes);
-    await controller.uploadPhoto(bytes, extension: ext);
+    Get.offAll(() => const MainShell());
   }
 
   // ----------------------------------------------------------------
@@ -222,11 +216,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Obx(() => PhotoPickerAvatar(
-                photoUrl: controller.me?.photoUrl,
-                localPreview: _photoPreview,
-                isUploading: controller.isSaving.value,
-                onPicked: _onPhotoPicked,
+          Obx(() => PhotoGridPicker(
+                userId: controller.me?.id ?? '',
+                initialPhotos: controller.me?.photoUrls ?? [],
+                profileService: const ProfileService(),
               )),
           const SizedBox(height: 8),
           const Center(
