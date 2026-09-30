@@ -7,6 +7,7 @@ class ProfileCardWidget extends StatefulWidget {
   final VoidCallback onLike;
   final VoidCallback onPass;
   final bool isFullCard;
+  final bool actionsEnabled;
 
   const ProfileCardWidget({
     super.key,
@@ -14,6 +15,7 @@ class ProfileCardWidget extends StatefulWidget {
     required this.onLike,
     required this.onPass,
     this.isFullCard = true,
+    this.actionsEnabled = true,
   });
 
   @override
@@ -125,13 +127,15 @@ class _ProfileCardWidgetState extends State<ProfileCardWidget> {
                   children: [
                     _actionButton(
                       icon: Icons.close,
-                      color: Colors.grey.shade500,
-                      onTap: widget.onPass,
+                      label: 'Dislike',
+                      color: Colors.grey.shade600,
+                      onTap: actionsEnabled ? onPass : null,
                     ),
                     _actionButton(
                       icon: Icons.favorite,
-                      color: AppColors.primary,
-                      onTap: widget.onLike,
+                      label: 'Like',
+                      color: AppColors.primaryDeep,
+                      onTap: actionsEnabled ? onLike : null,
                     ),
                   ],
                 ),
@@ -261,21 +265,38 @@ class _ProfileCardWidgetState extends State<ProfileCardWidget> {
 
   Widget _actionButton({
     required IconData icon,
+    required String label,
     required Color color,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(30),
-      child: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: color, width: 2),
+    final effectiveColor = onTap == null ? Colors.grey.shade300 : color;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(30),
+          child: Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: effectiveColor, width: 2),
+            ),
+            child: Icon(icon, color: effectiveColor, size: 28),
+          ),
         ),
-        child: Icon(icon, color: color, size: 28),
-      ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: effectiveColor,
+          ),
+        ),
+      ],
     );
   }
 }

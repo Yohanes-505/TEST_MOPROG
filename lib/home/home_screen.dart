@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bumble/models/profile_model.dart';
+import 'package:bumble/services/swipe_service.dart';
+import 'package:bumble/widgets/match_dialog.dart';
 import 'package:bumble/widgets/profile_card_widget.dart';
 
-// Fallback jika instansiasi 'supabase' dari service belum ada
 final _supabaseClient = Supabase.instance.client;
 
 class HomeScreen extends StatefulWidget {
@@ -19,6 +20,11 @@ class _HomeScreenState extends State<HomeScreen> {
   List<ProfileModel> dailyBrew = [];
   bool isLoading = true;
   final int dailyLimit = 5;
+
+  final SwipeService _swipeService = const SwipeService();
+
+  /// id profil yang pilihannya sedang dikirim (cegah tap ganda).
+  final Set<String> _busyIds = {};
 
   @override
   void initState() {
@@ -67,56 +73,32 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> handleSwipe(ProfileModel profile, String action) async {
+  Future<void> handleSwipe(ProfileModel profile, SwipeAction action) async {
+    if (_busyIds.contains(profile.id)) return;
+    setState(() => _busyIds.add(profile.id));
+
     try {
-      final myId = _supabaseClient.auth.currentUser!.id;
+      // Simpan pilihan; kalau Like dan orang itu sudah lebih dulu like kita,
+      // match dibuat dan `isMatch` bernilai true.
+      final isMatch = await _swipeService.submit(
+        targetId: profile.id,
+        action: action,
+      );
 
-      await _supabaseClient.from('swipes').upsert({
-        'swiper_id': myId,
-        'swiped_id': profile.id,
-        'action': action,
-      });
-
-      // 2. Jika aksi adalah 'like', cek apakah ada Mutual Like
-      if (action == 'like') {
-        final checkMatchList = await _supabaseClient
-            .from('swipes')
-            .select()
-            .eq('swiper_id', profile.id)
-            .eq('swiped_id', myId)
-            .eq('action', 'like')
-            .limit(1);
-
-        if (checkMatchList.isNotEmpty) {
-          try {
-            await _supabaseClient.from('matches').insert({
-              'user1_id': myId,
-              'user2_id': profile.id,
-            });
-          } catch (insertError) {
-            debugPrint('Match mungkin sudah dibuat oleh Trigger: $insertError');
-          }
-
-          Get.snackbar(
-            'It\'s a Match!',
-            'Kamu dan ${profile.name} saling menyukai!',
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: AppColors.primary,
-            colorText: AppColors.onPrimary,
-          );
-        } else {
-          Get.snackbar(
-            'Liked',
-            profile.name,
-            snackPosition: SnackPosition.BOTTOM,
-          );
-        }
-      }
-      
       if (mounted) {
         setState(() {
           dailyBrew.removeWhere((p) => p.id == profile.id);
         });
+      }
+
+      if (isMatch) {
+        await showMatchDialog(profile);
+      } else if (action == SwipeAction.like) {
+        Get.snackbar(
+          'Liked',
+          profile.name,
+          snackPosition: SnackPosition.BOTTOM,
+        );
       }
     } catch (e) {
       Get.snackbar(
@@ -124,6 +106,8 @@ class _HomeScreenState extends State<HomeScreen> {
         'Something went wrong',
         snackPosition: SnackPosition.BOTTOM,
       );
+    } finally {
+      if (mounted) setState(() => _busyIds.remove(profile.id));
     }
   }
 
@@ -199,8 +183,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                                 child: ProfileCardWidget(
                                   profile: profile,
-                                  onLike: () => handleSwipe(profile, 'like'),
-                                  onPass: () => handleSwipe(profile, 'pass'),
+                                  actionsEnabled: !_busyIds.contains(profile.id),
+                                  onLike: () =>
+                                      handleSwipe(profile, SwipeAction.like),
+                                  onPass: () =>
+                                      handleSwipe(profile, SwipeAction.dislike),
                                 ),
                               );
                             },

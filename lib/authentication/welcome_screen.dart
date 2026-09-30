@@ -28,7 +28,7 @@ class WelcomeScreen extends StatelessWidget {
               const SizedBox(height: 32),
 
               const Text(
-                "Welcome to Meetcha!",
+                "Welcome to Matcha!",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 26,

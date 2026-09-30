@@ -1,4 +1,8 @@
 import 'package:bumble/constants/app_colors.dart';
+import 'package:bumble/models/profile_model.dart';
+import 'package:bumble/services/swipe_service.dart';
+import 'package:bumble/widgets/match_dialog.dart';
+import 'package:bumble/widgets/profile_card_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../services/subscription_service.dart';
@@ -13,24 +17,61 @@ class LikesScreen extends StatefulWidget {
 
 class _LikesScreenState extends State<LikesScreen> {
   final SubscriptionService _service = SubscriptionService();
+  final SwipeService _swipeService = const SwipeService();
+
   LikersResult? _result;
+
+  List<ProfileModel> _likers = [];
+
+  final Set<String> _busyIds = {};
+
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _load(showSpinner: false); 
   }
 
-  Future<void> _load() async {
-    setState(() => _isLoading = true);
+  Future<void> _load({bool showSpinner = true}) async {
+    if (showSpinner) setState(() => _isLoading = true);
     try {
       final result = await _service.getMyLikers();
-      setState(() => _result = result);
+      final likers = result.eligible
+          ? await _swipeService.getPendingLikerProfiles(result.likerIds)
+          : <ProfileModel>[];
+
+      if (!mounted) return;
+      setState(() {
+        _result = result;
+        _likers = likers;
+      });
     } catch (e) {
       Get.snackbar('Gagal', 'Tidak bisa memuat data: ${e.toString()}', snackPosition: SnackPosition.BOTTOM);
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  /// Kalau di-like balik, langsung jadi match.
+  Future<void> _respond(ProfileModel profile, SwipeAction action) async {
+    if (_busyIds.contains(profile.id)) return;
+    setState(() => _busyIds.add(profile.id));
+
+    try {
+      final isMatch = await _swipeService.submit(
+        targetId: profile.id,
+        action: action,
+      );
+      if (!mounted) return;
+
+      setState(() => _likers.removeWhere((p) => p.id == profile.id));
+
+      if (isMatch) await showMatchDialog(profile);
+    } catch (e) {
+      Get.snackbar('Gagal', 'Pilihanmu belum tersimpan. Coba lagi.', snackPosition: SnackPosition.BOTTOM);
+    } finally {
+      if (mounted) setState(() => _busyIds.remove(profile.id));
     }
   }
 
@@ -53,16 +94,25 @@ class _LikesScreenState extends State<LikesScreen> {
   }
 
   Widget _buildEligibleView() {
-    if (_result!.likerIds.isEmpty) {
+    if (_likers.isEmpty) {
+      final hasRespondedAll = _result!.likerIds.isNotEmpty;
       return RefreshIndicator(
         color: AppColors.primaryDeep,
-        onRefresh: _load,
+        onRefresh: () => _load(showSpinner: false),
         child: ListView(
-          children: const [
-            SizedBox(height: 120),
-            Icon(Icons.favorite_border, size: 48, color: AppColors.mist),
-            SizedBox(height: 12),
-            Center(child: Text('Belum ada yang like kamu', style: TextStyle(color: AppColors.textSecondary))),
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            const SizedBox(height: 120),
+            const Icon(Icons.favorite_border, size: 48, color: AppColors.mist),
+            const SizedBox(height: 12),
+            Center(
+              child: Text(
+                hasRespondedAll
+                    ? 'Kamu sudah merespons semua yang menyukaimu'
+                    : 'Belum ada yang like kamu',
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
           ],
         ),
       );
@@ -70,34 +120,20 @@ class _LikesScreenState extends State<LikesScreen> {
 
     return RefreshIndicator(
       color: AppColors.primaryDeep,
-      onRefresh: _load,
-      child: GridView.builder(
-        padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 0.75,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-        ),
-        itemCount: _result!.likerIds.length,
-        itemBuilder: (context, index) => _buildLikerTile(_result!.likerIds[index]),
-      ),
-    );
-  }
-
-  Widget _buildLikerTile(String likerId) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.primarySoft,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: const Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.person, size: 48, color: AppColors.primaryDeep),
-          SizedBox(height: 8),
-          Text('Menyukaimu', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-        ],
+      onRefresh: () => _load(showSpinner: false),
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        itemCount: _likers.length,
+        itemBuilder: (context, index) {
+          final profile = _likers[index];
+          return ProfileCardWidget(
+            profile: profile,
+            isFullCard: false,
+            actionsEnabled: !_busyIds.contains(profile.id),
+            onLike: () => _respond(profile, SwipeAction.like),
+            onPass: () => _respond(profile, SwipeAction.dislike),
+          );
+        },
       ),
     );
   }
@@ -110,7 +146,6 @@ class _LikesScreenState extends State<LikesScreen> {
       child: Column(
         children: [
           const SizedBox(height: 40),
-          // Stack kartu blur sebagai teaser visual
           SizedBox(
             height: 200,
             child: Stack(
