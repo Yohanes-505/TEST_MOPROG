@@ -2,6 +2,7 @@ import 'package:bumble/constants/app_colors.dart';
 import 'package:bumble/home/home_screen.dart';
 import 'package:bumble/profile/profile_tab_screen.dart';
 import 'package:bumble/screens/match_screen.dart';
+import 'package:bumble/services/match_chat_service.dart';
 import 'package:flutter/material.dart';
 
 /// Node flowchart: "Home (Bottom Navigation)".
@@ -32,7 +33,10 @@ class _MainShellState extends State<MainShell> {
       body: IndexedStack(index: _index, children: _tabs),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        onDestinationSelected: (i) {
+          setState(() => _index = i);
+          if (i == 1) MatchChatService.notifyMatchesChanged();
+        },
         indicatorColor: AppColors.primary.withValues(alpha: 0.35),
         destinations: const [
           NavigationDestination(

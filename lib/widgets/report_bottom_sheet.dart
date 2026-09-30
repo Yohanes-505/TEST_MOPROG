@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bumble/models/report_model.dart';
 import 'package:bumble/services/report_service.dart';
 
@@ -58,7 +59,14 @@ class _ReportBottomSheetState extends State<ReportBottomSheet> {
   }
 
   Future<void> _submit() async {
-    final reporterId = 'GANTI_DENGAN_USER_ID_YANG_LOGIN';
+    final reporterId = Supabase.instance.client.auth.currentUser?.id;
+
+    if (reporterId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sesi berakhir, silakan login ulang')),
+      );
+      return;
+    }
 
     if (_selectedReason == null) {
       ScaffoldMessenger.of(context).showSnackBar(

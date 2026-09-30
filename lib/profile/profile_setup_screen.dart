@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'package:bumble/constants/app_colors.dart';
 import 'package:bumble/constants/interest_options.dart';
 import 'package:bumble/controllers/profile_controller.dart';
-import 'package:bumble/home/home_screen.dart';
 import 'package:bumble/home/main_shell.dart';
 import 'package:bumble/models/profile_model.dart';
 import 'package:bumble/widgets/interest_selector.dart';
