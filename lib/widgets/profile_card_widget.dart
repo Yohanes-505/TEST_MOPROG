@@ -45,7 +45,7 @@ class _ProfileCardWidgetState extends State<ProfileCardWidget> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -129,13 +129,13 @@ class _ProfileCardWidgetState extends State<ProfileCardWidget> {
                       icon: Icons.close,
                       label: 'Dislike',
                       color: Colors.grey.shade600,
-                      onTap: actionsEnabled ? onPass : null,
+                      onTap: widget.actionsEnabled ? widget.onPass : null,
                     ),
                     _actionButton(
                       icon: Icons.favorite,
                       label: 'Like',
                       color: AppColors.primaryDeep,
-                      onTap: actionsEnabled ? onLike : null,
+                      onTap: widget.actionsEnabled ? widget.onLike : null,
                     ),
                   ],
                 ),
@@ -218,7 +218,7 @@ class _ProfileCardWidgetState extends State<ProfileCardWidget> {
                     decoration: BoxDecoration(
                       color: index == _currentPhoto
                           ? Colors.white
-                          : Colors.white.withOpacity(0.4),
+                          : Colors.white.withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),

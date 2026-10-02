@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:bumble/constants/app_colors.dart';
 import 'package:bumble/models/chat_message.dart';
 import 'package:bumble/models/profile_model.dart';
 import 'package:bumble/models/report_model.dart';
 import 'package:bumble/services/match_chat_service.dart';
 import 'package:bumble/utils/date_label.dart';
+import 'package:bumble/utils/network_error.dart';
 import 'package:bumble/widgets/report_bottom_sheet.dart';
 import 'package:bumble/widgets/user_avatar.dart';
 import 'package:flutter/material.dart';
@@ -19,16 +22,21 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final MatchChatService _service = const MatchChatService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _inputFocus = FocusNode();
   final List<ChatMessage> _messages = [];
+
+  ChatRoom? _room;
   RealtimeChannel? _channel;
+  Timer? _pollTimer;
 
   bool _isLoading = true;
   bool _isSending = false;
+  bool _syncing = false;
+  bool _realtimeDown = false;
   String? _loadError;
 
   String? get _myId => _service.currentUserId;
@@ -36,54 +44,108 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _channel = _service.subscribeToIncomingMessages(
-      fromUserId: widget.matchProfile.id,
-      onMessage: _onIncomingMessage,
-    );
-    _loadMessages();
+    WidgetsBinding.instance.addObserver(this);
+    _start();
+
+    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (_realtimeDown) _syncSilently();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _syncSilently();
   }
 
   @override
   void dispose() {
-    final channel = _channel;
-    if (channel != null) _service.unsubscribe(channel);
+    WidgetsBinding.instance.removeObserver(this);
+    _pollTimer?.cancel();
+    _closeChannel();
     _messageController.dispose();
     _scrollController.dispose();
     _inputFocus.dispose();
     super.dispose();
   }
 
-  Future<void> _loadMessages() async {
+  void _closeChannel() {
+    final channel = _channel;
+    _channel = null;
+    if (channel != null) _service.unsubscribe(channel);
+  }
+
+  Future<void> _start() async {
     setState(() {
       _isLoading = true;
       _loadError = null;
+      _realtimeDown = false;
     });
 
     try {
-      final history = await _service.getMessages(widget.matchProfile.id);
+      final room = await _service.openRoom(widget.matchProfile.id);
       if (!mounted) return;
+      _room = room;
+      _closeChannel();
+      _channel = _service.subscribeToRoom(
+        room: room,
+        onMessage: _onIncomingMessage,
+        onStatus: _onRealtimeStatus,
+      );
 
-      final knownIds = history.map((m) => m.id).toSet();
-      final merged = <ChatMessage>[
-        ...history,
-        for (final m in _messages)
-          if (!knownIds.contains(m.id)) m,
-      ]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-      setState(() {
-        _messages
-          ..clear()
-          ..addAll(merged);
-        _isLoading = false;
-      });
+      final history = await _service.getMessages(room);
+      if (!mounted) return;
+      _applyHistory(history);
     } catch (e) {
-      debugPrint('Gagal memuat chat: $e');
+      debugPrint('Gagal membuka chat: $e');
       if (!mounted) return;
+      _room = null; 
+      _closeChannel();
       setState(() {
         _isLoading = false;
-        _loadError = 'Pesan gagal dimuat.';
+        _loadError = friendlyError(e);
       });
     }
+  }
+
+  void _onRealtimeStatus(RealtimeSubscribeStatus status, Object? error) {
+    if (!mounted) return;
+    if (error != null) debugPrint('Realtime chat: $status ($error)');
+
+    final ok = status == RealtimeSubscribeStatus.subscribed;
+    if (_realtimeDown == ok) setState(() => _realtimeDown = !ok);
+    if (ok) _syncSilently();
+  }
+
+  Future<void> _syncSilently() async {
+    final room = _room;
+    if (room == null || _syncing || !mounted) return;
+    _syncing = true;
+    try {
+      final history = await _service.getMessages(room);
+      if (!mounted) return;
+      _applyHistory(history);
+    } catch (e) {
+      debugPrint('Sinkron chat gagal (diabaikan): $e');
+    } finally {
+      _syncing = false;
+    }
+  }
+
+  void _applyHistory(List<ChatMessage> history) {
+    final knownIds = history.map((m) => m.id).toSet();
+    final merged = <ChatMessage>[
+      ...history,
+      for (final m in _messages)
+        if (!knownIds.contains(m.id)) m,
+    ]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    setState(() {
+      _messages
+        ..clear()
+        ..addAll(merged);
+      _isLoading = false;
+      _loadError = null;
+    });
   }
 
   void _onIncomingMessage(ChatMessage message) {
@@ -93,17 +155,15 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _sendMessage() async {
+    final room = _room;
     final text = _messageController.text.trim();
-    if (text.isEmpty || _isSending || _myId == null) return;
+    if (room == null || text.isEmpty || _isSending || _myId == null) return;
 
     setState(() => _isSending = true);
     _messageController.clear();
 
     try {
-      final sent = await _service.sendMessage(
-        receiverId: widget.matchProfile.id,
-        text: text,
-      );
+      final sent = await _service.sendMessage(room: room, text: text);
       if (!mounted) return;
 
       setState(() {
@@ -113,16 +173,27 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (e) {
       debugPrint('Gagal mengirim pesan: $e');
       if (!mounted) return;
+
       if (_messageController.text.isEmpty) {
         _messageController.text = text;
         _messageController.selection =
             TextSelection.collapsed(offset: text.length);
       }
-      Get.snackbar(
-        'Gagal mengirim',
-        'Pesan tidak terkirim. Periksa koneksi lalu coba lagi.',
-        snackPosition: SnackPosition.BOTTOM,
-      );
+
+      if (e is TimeoutException) {
+        _syncSilently();
+        Get.snackbar(
+          'Koneksi lambat',
+          'Pesan belum terkonfirmasi. Cek riwayat chat sebelum mengirim ulang.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      } else {
+        Get.snackbar(
+          'Gagal mengirim',
+          friendlyError(e),
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isSending = false);
@@ -145,6 +216,7 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       reportedUserId: widget.matchProfile.id,
       source: ReportSource.chat,
+      chatRoomId: _room?.primaryMatchId,
     );
   }
 
@@ -191,8 +263,34 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
+          _buildConnectionBanner(),
           Expanded(child: _buildMessages()),
           _buildInputBar(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConnectionBanner() {
+    if (!_realtimeDown || _loadError != null) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      color: AppColors.warningSoft,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: const Row(
+        children: [
+          SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Koneksi realtime terputus. Mencoba menyambung ulang…',
+              style: TextStyle(fontSize: 12),
+            ),
+          ),
         ],
       ),
     );
@@ -208,10 +306,16 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(_loadError!,
-                style: const TextStyle(color: AppColors.textSecondary)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                _loadError!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
             TextButton(
-              onPressed: _loadMessages,
+              onPressed: _start,
               child: const Text('Coba lagi'),
             ),
           ],
@@ -272,6 +376,7 @@ class _ChatScreenState extends State<ChatScreen> {
               child: TextField(
                 controller: _messageController,
                 focusNode: _inputFocus,
+                enabled: _room != null,
                 textInputAction: TextInputAction.send,
                 textCapitalization: TextCapitalization.sentences,
                 onSubmitted: (_) => _sendMessage(),
@@ -302,7 +407,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       )
                     : const Icon(Icons.send, color: AppColors.onPrimary, size: 20),
-                onPressed: _isSending ? null : _sendMessage,
+                onPressed: (_isSending || _room == null) ? null : _sendMessage,
               ),
             ),
           ],
