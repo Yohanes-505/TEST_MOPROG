@@ -7,6 +7,7 @@ class MatchPreview {
   final String? lastMessage;
   final DateTime? lastMessageAt;
   final bool lastMessageIsMine;
+  final List<String> matchIds;
 
   const MatchPreview({
     required this.profile,
@@ -14,6 +15,7 @@ class MatchPreview {
     this.lastMessage,
     this.lastMessageAt,
     this.lastMessageIsMine = false,
+    this.matchIds = const [],
   });
 
   bool get hasMessages => lastMessage != null;
