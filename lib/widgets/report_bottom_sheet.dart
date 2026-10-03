@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:bumble/models/report_model.dart';
-import 'package:bumble/services/report_service.dart';
+import '../models/report_model.dart';
+import '../services/report_service.dart';
 
 const List<String> _reportReasons = [
   'Spam atau penipuan',
@@ -59,11 +59,10 @@ class _ReportBottomSheetState extends State<ReportBottomSheet> {
   }
 
   Future<void> _submit() async {
-    final reporterId = Supabase.instance.client.auth.currentUser?.id;
-
-    if (reporterId == null) {
+    final currentUser = Supabase.instance.client.auth.currentUser;
+    if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sesi berakhir, silakan login ulang')),
+        const SnackBar(content: Text('Kamu harus login dulu untuk melapor')),
       );
       return;
     }
@@ -89,7 +88,7 @@ class _ReportBottomSheetState extends State<ReportBottomSheet> {
     setState(() => _isSubmitting = true);
 
     final success = await ReportService.submitReport(
-      reporterId: reporterId,
+      reporterId: currentUser.id,
       reportedUserId: widget.reportedUserId,
       reason: reason,
       source: widget.source,
