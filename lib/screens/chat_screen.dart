@@ -37,6 +37,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _isSending = false;
   bool _syncing = false;
   bool _realtimeDown = false;
+  bool _disposed = false;
+  int _channelGen = 0;
   String? _loadError;
 
   String? get _myId => _service.currentUserId;
@@ -59,6 +61,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _disposed = true;
     WidgetsBinding.instance.removeObserver(this);
     _pollTimer?.cancel();
     _closeChannel();
@@ -69,6 +72,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   void _closeChannel() {
+    _channelGen++; 
     final channel = _channel;
     _channel = null;
     if (channel != null) _service.unsubscribe(channel);
@@ -86,10 +90,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (!mounted) return;
       _room = room;
       _closeChannel();
+      final gen = _channelGen;
       _channel = _service.subscribeToRoom(
         room: room,
         onMessage: _onIncomingMessage,
-        onStatus: _onRealtimeStatus,
+        onStatus: (status, error) => _onRealtimeStatus(gen, status, error),
       );
 
       final history = await _service.getMessages(room);
@@ -107,8 +112,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
-  void _onRealtimeStatus(RealtimeSubscribeStatus status, Object? error) {
-    if (!mounted) return;
+  void _onRealtimeStatus(
+    int gen,
+    RealtimeSubscribeStatus status,
+    Object? error,
+  ) {
+    if (!mounted || _disposed || gen != _channelGen) return;
     if (error != null) debugPrint('Realtime chat: $status ($error)');
 
     final ok = status == RealtimeSubscribeStatus.subscribed;
@@ -149,7 +158,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   void _onIncomingMessage(ChatMessage message) {
-    if (!mounted) return;
+    if (!mounted || _disposed) return;
     if (_messages.any((m) => m.id == message.id)) return;
     setState(() => _messages.insert(0, message));
   }
