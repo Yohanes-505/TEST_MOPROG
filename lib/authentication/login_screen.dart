@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bumble/services/supabase_service.dart';
 import 'package:bumble/constants/app_colors.dart';
 import 'package:bumble/services/profile_service.dart';
@@ -6,6 +8,7 @@ import 'package:bumble/authentication/forgot_password_screen.dart';
 import 'package:bumble/profile/profile_setup_screen.dart';
 // import 'package:bumble/home/home_screen.dart';
 import 'package:bumble/home/main_shell.dart';
+import 'package:bumble/services/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -45,6 +48,9 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (response.user != null) {
+
+        unawaited(saveCurrentFcmToken());
+
         final complete = await isProfileComplete(response.user!.id);
         Get.offAll(() => complete ? const MainShell() : const ProfileSetupScreen());
         // Login success navigate to the next screen

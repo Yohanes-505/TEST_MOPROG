@@ -7,6 +7,7 @@ import 'package:bumble/models/report_model.dart';
 import 'package:bumble/services/match_chat_service.dart';
 import 'package:bumble/utils/date_label.dart';
 import 'package:bumble/utils/network_error.dart';
+import 'package:bumble/widgets/block_confirm_dialog.dart';
 import 'package:bumble/widgets/report_bottom_sheet.dart';
 import 'package:bumble/widgets/user_avatar.dart';
 import 'package:flutter/material.dart';
@@ -229,6 +230,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _blockUser() async {
+    final blocked = await showBlockConfirmDialog(
+      context: context,
+      blockedUserId: widget.matchProfile.id,
+      blockedUserName: widget.matchProfile.name,
+    );
+
+    if (blocked == true && mounted) {
+      // keluar dari chat room abis ngeblok
+      Navigator.of(context).pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -254,6 +268,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           PopupMenuButton<String>(
             onSelected: (value) {
               if (value == 'report') _reportUser();
+              if (value == 'block') _blockUser();
             },
             itemBuilder: (context) => const [
               PopupMenuItem(
@@ -263,6 +278,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     Icon(Icons.flag_outlined, color: AppColors.error, size: 20),
                     SizedBox(width: 8),
                     Text('Laporkan'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'block',
+                child: Row(
+                  children: [
+                    Icon(Icons.block, color: AppColors.error, size: 20),
+                    SizedBox(width: 8),
+                    Text('Blokir'),
                   ],
                 ),
               ),
