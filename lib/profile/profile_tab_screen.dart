@@ -2,6 +2,7 @@ import 'package:bumble/authentication/welcome_screen.dart';
 import 'package:bumble/constants/app_colors.dart';
 import 'package:bumble/controllers/profile_controller.dart';
 import 'package:bumble/models/profile_model.dart';
+import 'package:bumble/profile/blocked_users_screen.dart';
 import 'package:bumble/profile/edit_profile_screen.dart';
 import 'package:bumble/profile/filter_preference_screen.dart';
 import 'package:bumble/profile/safe_dating_tips_screen.dart';
@@ -80,6 +81,12 @@ class ProfileTabScreen extends StatelessWidget {
                 title: 'Safe Dating Tips',
                 subtitle: 'Panduan aman sebelum bertemu orang baru',
                 onTap: () => Get.to(() => const SafeDatingTipsScreen()),
+              ),
+              _menuTile(
+                icon: Icons.block,
+                title: 'Akun yang Diblokir',
+                subtitle: 'Lihat & buka blokir akun yang pernah kamu blokir',
+                onTap: () => Get.to(() => const BlockedUsersScreen()),
               ),
               const SizedBox(height: 24),
               OutlinedButton.icon(

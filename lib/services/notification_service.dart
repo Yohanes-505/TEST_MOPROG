@@ -80,6 +80,14 @@ Future initNotifications() async {
   }
 }
 
+/// Manggil ini setelah user berhasil login ato signup. initNotifications()
+Future<void> saveCurrentFcmToken() async {
+  final token = await _messaging.getToken();
+  if (token != null) {
+    await _saveTokenToSupabase(token);
+  }
+}
+
 Future _saveTokenToSupabase(String token) async {
   final currentUser = Supabase.instance.client.auth.currentUser;
   if (currentUser == null) {
@@ -142,7 +150,7 @@ Future _showLocalNotification(AppNotification notif) async {
         priority: Priority.high,
       ),
     ),
-    payload: '\({notif.type.name}|\){notif.relatedId ?? ''}',
+    payload: '${notif.type.name}|${notif.relatedId ?? ''}',
   );
 }
 

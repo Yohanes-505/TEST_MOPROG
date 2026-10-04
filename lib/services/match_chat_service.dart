@@ -141,6 +141,33 @@ class MatchChatService {
     }
   }
 
+  /// cari profil lawan chat dari sebuah match id 
+  /// dipakai saat notifikasi "prsan baru" / "it's a match!"
+  Future<ProfileModel?> getProfileForMatchId(String matchId) async {
+    final myId = currentUserId;
+    if (myId == null) return null;
+
+    try {
+      final row = await _client
+          .from('matches')
+          .select('user1_id, user2_id')
+          .eq('id', matchId)
+          .maybeSingle();
+      if (row == null) return null;
+
+      final a = row['user1_id'].toString();
+      final b = row['user2_id'].toString();
+      final otherId = a == myId ? b : a;
+      if (otherId == myId) return null;
+
+      final profiles = await _fetchProfiles([otherId]);
+      return profiles[otherId];
+    } catch (e) {
+      debugPrint('Gagal ambil profil dari match_id: $e');
+      return null;
+    }
+  }
+
   Future<ChatRoom> openRoom(String otherId) async {
     final myId = currentUserId;
     if (myId == null) {
