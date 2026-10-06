@@ -12,7 +12,14 @@ class ChatRoom {
   final String primaryMatchId;
   final List<String> matchIds;
 
-  const ChatRoom({required this.primaryMatchId, required this.matchIds});
+  // Ini buat nunjukin kapan match terjadi, fungsinya biar bisa dihitung kadaluarsanya
+  final DateTime? matchedAt;
+
+  const ChatRoom({
+    required this.primaryMatchId,
+    required this.matchIds,
+    this.matchedAt,
+  });
 }
 
 class _MatchRef {
@@ -177,7 +184,7 @@ class MatchChatService {
     final rows = await withRetry(
       () async => await _client
           .from('matches')
-          .select('id')
+          .select('id, created_at')
           .or(
             'and(user1_id.eq.$myId,user2_id.eq.$otherId),'
             'and(user1_id.eq.$otherId,user2_id.eq.$myId)',
@@ -192,7 +199,11 @@ class MatchChatService {
         'Match dengan pengguna ini tidak ditemukan. Mungkin sudah dihapus.',
       );
     }
-    return ChatRoom(primaryMatchId: ids.first, matchIds: ids);
+    return ChatRoom(
+      primaryMatchId: ids.first,
+      matchIds: ids,
+      matchedAt: DateTime.tryParse('${rows.first['created_at']}')?.toLocal(),
+    );
   }
 
   Future<List<ChatMessage>> getMessages(ChatRoom room, {int limit = 200}) async {

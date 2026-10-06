@@ -24,6 +24,8 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
+  static const Duration _matchLifetime = Duration(hours: 24);
+
   final MatchChatService _service = const MatchChatService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -33,6 +35,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   ChatRoom? _room;
   RealtimeChannel? _channel;
   Timer? _pollTimer;
+  Timer? _expiryTicker;
 
   bool _isLoading = true;
   bool _isSending = false;
@@ -53,6 +56,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (_realtimeDown) _syncSilently();
     });
+
+    // Reload countdown buat waktu kadaluarsa
+    _expiryTicker = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted && _room?.matchedAt != null) setState(() {});
+    });
   }
 
   @override
@@ -65,6 +73,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _disposed = true;
     WidgetsBinding.instance.removeObserver(this);
     _pollTimer?.cancel();
+    _expiryTicker?.cancel();
     _closeChannel();
     _messageController.dispose();
     _scrollController.dispose();
@@ -247,23 +256,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: 0,
-        title: Row(
-          children: [
-            UserAvatar(photoUrl: widget.matchProfile.photoUrl, radius: 16),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                widget.matchProfile.name,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-        ),
         backgroundColor: Colors.white,
         foregroundColor: AppColors.ink,
-        elevation: 1,
+        elevation: 0,
         actions: [
           PopupMenuButton<String>(
             onSelected: (value) {
@@ -297,9 +292,63 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       ),
       body: Column(
         children: [
+          _buildProfileHeader(),
           _buildConnectionBanner(),
           Expanded(child: _buildMessages()),
           _buildInputBar(),
+        ],
+      ),
+    );
+  }
+
+  // Ini buat nunjukkin berapa lama lagi sebelum matchnya kadaluarsa
+  Duration? get _remaining {
+    final at = _room?.matchedAt;
+    if (at == null) return null;
+    final left = at.add(_matchLifetime).difference(DateTime.now());
+    return left.isNegative ? Duration.zero : left;
+  }
+
+  Widget _buildProfileHeader() {
+    final profile = widget.matchProfile;
+    final remaining = _remaining;
+    final expired = remaining == Duration.zero;
+    final urgent =
+        remaining != null && !expired && remaining < const Duration(hours: 3);
+
+    final expiryColor = expired
+        ? AppColors.error
+        : urgent
+            ? AppColors.warning
+            : AppColors.textSecondary;
+
+    final nameLabel =
+        profile.age != null ? '${profile.name}, ${profile.age}' : profile.name;
+
+    return Container(
+      width: double.infinity,
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          UserAvatar(photoUrl: profile.photoUrl, radius: 40),
+          const SizedBox(height: 12),
+          Text(
+            nameLabel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          if (remaining != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              expired
+                  ? 'Match kadaluarsa'
+                  : '${formatRemaining(remaining)} lagi untuk mengirim pesan',
+              style: TextStyle(fontSize: 13, color: expiryColor),
+            ),
+          ],
         ],
       ),
     );
