@@ -140,76 +140,131 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   // UI
   // ----------------------------------------------------------------
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _header(),
-            Expanded(
-              child: PageView(
-                controller: _pageController,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  _stepAboutYou(),
-                  _stepInterests(),
-                  _stepLocation(),
-                ],
+ @override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: AppColors.background,
+    body: SafeArea(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            children: [
+              _header(),
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    _stepAboutYou(),
+                    _stepInterests(),
+                    _stepLocation(),
+                  ],
+                ),
               ),
-            ),
-            _footer(),
-          ],
+              _footer(),
+            ],
+          ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _header() {
-    const titles = ['Tentang Kamu', 'Minat Kamu', 'Lokasi & Preferensi'];
-    const subtitles = [
-      'Isi data dasar supaya orang lain kenal kamu',
-      'Pilih minat agar kami cocokkan dengan orang yang mirip',
-      'Kami butuh lokasi untuk mencari orang di sekitarmu',
-    ];
+  const titles = [
+    'Tentang Kamu',
+    'Minat Kamu',
+    'Lokasi & Preferensi',
+  ];
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: List.generate(_totalSteps, (i) {
-              return Expanded(
-                child: Container(
-                  height: 4,
-                  margin: EdgeInsets.only(right: i == _totalSteps - 1 ? 0 : 6),
-                  decoration: BoxDecoration(
-                    color: i <= _step
-                        ? AppColors.primary
-                        : Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+  const subtitles = [
+    'Bantu kami mengenalmu sedikit lebih dekat.',
+    'Pilih hal-hal yang membuat kamu jadi dirimu.',
+    'Atur siapa yang ingin kamu temui di sekitar kamu.',
+  ];
+
+  return Padding(
+    padding: const EdgeInsets.fromLTRB(24, 22, 24, 10),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Langkah ${_step + 1} dari $_totalSteps',
+              style: const TextStyle(
+                color: AppColors.matchaDeep,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.3,
+              ),
+            ),
+            const Spacer(),
+            const Text(
+              'MEETCHA',
+              style: TextStyle(
+                color: AppColors.sage,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+
+        Row(
+          children: List.generate(_totalSteps, (i) {
+            final active = i <= _step;
+
+            return Expanded(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                height: 5,
+                margin: EdgeInsets.only(
+                  right: i == _totalSteps - 1 ? 0 : 7,
                 ),
-              );
-            }),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            titles[_step],
-            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            subtitles[_step],
-            style: const TextStyle(
-                fontSize: 14, color: AppColors.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
+                decoration: BoxDecoration(
+                  color: active
+                      ? AppColors.matcha
+                      : AppColors.matchaSoft,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            );
+          }),
+        ),
 
+        const SizedBox(height: 24),
+
+        Text(
+          titles[_step],
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 28,
+            height: 1.1,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.5,
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        Text(
+          subtitles[_step],
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 14,
+            height: 1.45,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    ),
+  );
+}
   Widget _stepAboutYou() {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
@@ -454,60 +509,90 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Widget _footer() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-      child: Row(
-        children: [
-          if (_step > 0)
-            Expanded(
-              child: SizedBox(
-                height: 50,
-                child: OutlinedButton(
-                  onPressed: () => _goTo(_step - 1),
-                  child: const Text('Kembali'),
+  return Container(
+    padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
+    decoration: const BoxDecoration(
+      color: AppColors.background,
+      border: Border(
+        top: BorderSide(
+          color: AppColors.border,
+          width: 0.7,
+        ),
+      ),
+    ),
+    child: Row(
+      children: [
+        if (_step > 0)
+          Expanded(
+            child: SizedBox(
+              height: 54,
+              child: OutlinedButton(
+                onPressed: () => _goTo(_step - 1),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.matchaDeep,
+                  side: const BorderSide(
+                    color: AppColors.primaryBorder,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+                child: const Text(
+                  'Kembali',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
-          if (_step > 0) const SizedBox(width: 12),
-          Expanded(
-            flex: 2,
-            child: SizedBox(
-              height: 50,
-              child: Obx(() {
-                final busy = controller.isSaving.value;
-                return ElevatedButton(
-                  onPressed: busy ? null : _onNext,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: busy
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.onPrimary,
-                          ),
-                        )
-                      : Text(
-                          _step == _totalSteps - 1 ? 'Selesai' : 'Lanjut',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: AppColors.onPrimary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                );
-              }),
-            ),
           ),
-        ],
-      ),
-    );
-  }
+
+        if (_step > 0) const SizedBox(width: 12),
+
+        Expanded(
+          flex: 2,
+          child: SizedBox(
+            height: 54,
+            child: Obx(() {
+              final busy = controller.isSaving.value;
+
+              return ElevatedButton(
+                onPressed: busy ? null : _onNext,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.onPrimary,
+                  disabledBackgroundColor: AppColors.sage,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+                child: busy
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.onPrimary,
+                        ),
+                      )
+                    : Text(
+                        _step == _totalSteps - 1
+                            ? 'Selesai'
+                            : 'Lanjut',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+              );
+            }),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _label(String text) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
