@@ -3,39 +3,46 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
-  // Warna inti
-  static const Color lime = Color(0xFF9BF272);
-  static const Color green = Color(0xFF7ABF5A);
-  static const Color ink = Color(0xFF193940);
-  static const Color mist = Color(0xFFBAC8D9);
+  // Brand palette
+  static const Color matcha = Color(0xFF658C5E);
+  static const Color matchaDeep = Color(0xFF4F6B48);
+  static const Color sage = Color(0xFF91A287);
+  static const Color matchaSoft = Color(0xFFDDE6D5);
 
-  /// Latar tombol utama, chip terpilih, slider aktif.
-  static const Color primary = lime;
+  static const Color cream = Color(0xFFFFF0D6);
+  static const Color brown = Color(0xFF6F5840);
+  static const Color brownSoft = Color(0xFF9E7C5F);
 
-  /// Teks/ikon DI ATAS `primary`.
-  static const Color onPrimary = ink;
+  static const Color ink = Color(0xFF293329);
 
-  /// Hijau tua turunan — untuk ikon, teks, dan border hijau di atas putih.
-  static const Color primaryDeep = Color(0xFF3F7A2A);
+  // Legacy aliases
+  // Dipertahankan agar screen lama tidak rusak.
+  static const Color lime = matcha;
+  static const Color green = sage;
+  static const Color mist = Color(0xFFD8DED3);
 
-  /// Latar lembut bernuansa hijau (pengganti purple.shade50, dsb).
-  static const Color primarySoft = Color(0xFFEFFBE7);
+  // Primary
+  static const Color primary = matcha;
+  static const Color onPrimary = Colors.white;
 
-  /// Border tipis bernuansa hijau (pengganti purple.shade100).
-  static const Color primaryBorder = Color(0xFFCFEFBC);
+  static const Color primaryDeep = matchaDeep;
+  static const Color primarySoft = matchaSoft;
+  static const Color primaryBorder = Color(0xFFC6D5BD);
 
-  static const Color background = Colors.white;
-  static const Color surfaceMuted = Color(0xFFF2F5F8);
+  // Background
+  static const Color background = Color(0xFFFFFBF3);
+  static const Color surfaceMuted = Color(0xFFF3F5EF);
 
+  // Text
   static const Color textPrimary = ink;
-  static const Color textSecondary = Color(0xFF5E7079);
+  static const Color textSecondary = Color(0xFF687065);
 
-  /// Garis pemisah & border netral.
-  static const Color border = mist;
+  // Border
+  static const Color border = Color(0xFFD8DED3);
 
-  // Warna semantik
-  static const Color success = primaryDeep;
-  static const Color successSoft = primarySoft;
+  // Semantic
+  static const Color success = matchaDeep;
+  static const Color successSoft = matchaSoft;
 
   static const Color warning = Color(0xFFB7791F);
   static const Color warningSoft = Color(0xFFFFF4E0);
