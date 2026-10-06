@@ -13,6 +13,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'models/app_notification.dart';
 import 'firebase_options.dart';
 import 'services/notification_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 // import 'package:bumble/profile/profile_setup_screen.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
@@ -24,14 +25,18 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
+  if (!kIsWeb) {
+      FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
+  } 
 
   await Supabase.initialize(
     url: 'https://xwhglyvwosyptwylskmt.supabase.co',
     publishableKey: 'sb_publishable_IJ5sQ0p_YZrmMzSKS__o_Q_U61cdrQT',
   );
 
-  await initNotifications();
+  if (!kIsWeb) {
+    await initNotifications();
+  } 
 
   onNotificationTap = (AppNotification notif) {
     final nav = navigatorKey.currentState;
