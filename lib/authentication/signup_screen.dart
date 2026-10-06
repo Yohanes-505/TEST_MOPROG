@@ -84,157 +84,293 @@ class SignUpScreenState extends State<SignUpScreen> {
       setState(() => isLoading = false);
     }
   }
+  InputDecoration _inputDecoration({
+  required String hintText,
+  required IconData icon,
+  Widget? suffixIcon,
+}) {
+  return InputDecoration(
+    hintText: hintText,
+    hintStyle: const TextStyle(
+      color: AppColors.textSecondary,
+    ),
+    prefixIcon: Icon(
+      icon,
+      color: AppColors.textSecondary,
+    ),
+    suffixIcon: suffixIcon,
+    filled: true,
+    fillColor: AppColors.surfaceMuted,
+    contentPadding: const EdgeInsets.symmetric(
+      horizontal: 16,
+      vertical: 17,
+    ),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: const BorderSide(
+        color: AppColors.border,
+      ),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: const BorderSide(
+        color: AppColors.border,
+      ),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: const BorderSide(
+        color: AppColors.primary,
+        width: 1.5,
+      ),
+    ),
+  );
+}
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 35),
-
-              IconButton(
-                onPressed: () => Get.back(),
-                icon: const Icon(Icons.arrow_back),
-                padding: EdgeInsets.zero,
-              ),
-
-              const SizedBox(height: 20),
-
-              const Text(
-                "Create Account",
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                "Sign up to start your match up!",
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-
-              const SizedBox(height: 32),
-
-              const Text("Name", style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              TextField(
-                controller: nameController,
-                decoration: InputDecoration(
-                  hintText: "Enter your name",
-                  prefixIcon: const Icon(Icons.person),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: AppColors.background,
+    body: SafeArea(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Back button
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    color: AppColors.matchaSoft,
+                    shape: BoxShape.circle,
                   ),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              const Text("Email", style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              TextField(
-                controller: emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  hintText: "Enter your email",
-                  prefixIcon: const Icon(Icons.email),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              const Text("Password", style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              TextField(
-                controller: passwordController,
-                obscureText: isPasswordHidden,
-                decoration: InputDecoration(
-                  hintText: "Enter your password",
-                  prefixIcon: const Icon(Icons.lock),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      isPasswordHidden ? Icons.visibility : Icons.visibility_off,
-                    ),
-                    onPressed: () {
-                      setState(() => isPasswordHidden = !isPasswordHidden);
-                    },
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              const Text("Confirm Password", style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              TextField(
-                controller: confirmPasswordController,
-                obscureText: isPasswordHidden,
-                decoration: InputDecoration(
-                  hintText: "Re-enter your password",
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: isLoading ? null : handleSignUp,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  child: IconButton(
+                    onPressed: () => Get.back(),
+                    icon: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: AppColors.matchaDeep,
+                      size: 22,
                     ),
                   ),
-                  child: isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(color: AppColors.onPrimary),
-                        )
-                      : const Text(
-                          "Sign Up",
-                          style: TextStyle(fontSize: 16, color: AppColors.onPrimary, fontWeight: FontWeight.w700),
-                        ),
                 ),
-              ),
 
-              const SizedBox(height: 20),
+                const SizedBox(height: 30),
 
-              Center(
-                child: Row(
+                const Text(
+                  'Create your account',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 30,
+                    height: 1.1,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.6,
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                const Text(
+                  'Start with the basics. Your profile comes next.',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 15,
+                    height: 1.45,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+
+                const SizedBox(height: 30),
+
+                // Name
+                const Text(
+                  'Name',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+
+                const SizedBox(height: 9),
+
+                TextField(
+                  controller: nameController,
+                  textInputAction: TextInputAction.next,
+                  decoration: _inputDecoration(
+                    hintText: 'Enter your name',
+                    icon: Icons.person_outline_rounded,
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Email
+                const Text(
+                  'Email',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+
+                const SizedBox(height: 9),
+
+                TextField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  decoration: _inputDecoration(
+                    hintText: 'Enter your email',
+                    icon: Icons.mail_outline_rounded,
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Password
+                const Text(
+                  'Password',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+
+                const SizedBox(height: 9),
+
+                TextField(
+                  controller: passwordController,
+                  obscureText: isPasswordHidden,
+                  textInputAction: TextInputAction.next,
+                  decoration: _inputDecoration(
+                    hintText: 'Create a password',
+                    icon: Icons.lock_outline_rounded,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        isPasswordHidden
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                        color: AppColors.textSecondary,
+                      ),
+                      onPressed: () {
+                        setState(
+                          () => isPasswordHidden = !isPasswordHidden,
+                        );
+                      },
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                const Text(
+                  'Use at least 6 characters.',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Confirm Password
+                const Text(
+                  'Confirm password',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+
+                const SizedBox(height: 9),
+
+                TextField(
+                  controller: confirmPasswordController,
+                  obscureText: isPasswordHidden,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) {
+                    if (!isLoading) {
+                      handleSignUp();
+                    }
+                  },
+                  decoration: _inputDecoration(
+                    hintText: 'Re-enter your password',
+                    icon: Icons.lock_outline_rounded,
+                  ),
+                ),
+
+                const SizedBox(height: 28),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: isLoading ? null : handleSignUp,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.onPrimary,
+                      disabledBackgroundColor: AppColors.sage,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                    ),
+                    child: isLoading
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              color: AppColors.onPrimary,
+                              strokeWidth: 2.4,
+                            ),
+                          )
+                        : const Text(
+                            'Create Account',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                  ),
+                ),
+
+                const SizedBox(height: 18),
+
+                Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text("Already have an account?"),
+                    const Text(
+                      'Already have an account?',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                      ),
+                    ),
                     TextButton(
-                      onPressed: () => Get.back(), // balik ke LoginScreen
-                      child: const Text("Login"),
+                      onPressed: () => Get.back(),
+                      child: const Text(
+                        'Login',
+                        style: TextStyle(
+                          color: AppColors.matchaDeep,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    );
-  }
-}
+    ),
+  );
+}}
