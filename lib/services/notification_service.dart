@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatf
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
+import '../constants/app_colors.dart';
 import '../models/app_notification.dart';
 
 final FirebaseMessaging _messaging = FirebaseMessaging.instance;
@@ -47,7 +47,7 @@ Future initNotifications() async {
   });
 
   // setup local notification yang buat nampilin notif manual pas app lagi kebuka
-  const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const androidInit = AndroidInitializationSettings('@drawable/ic_notification');
   const initSettings = InitializationSettings(android: androidInit);
   await _localNotifications.initialize(
     initSettings,
@@ -201,6 +201,9 @@ Future _showLocalNotification(AppNotification notif) async {
         'App Notifications',
         importance: Importance.high,
         priority: Priority.high,
+        icon: '@drawable/ic_notification',
+        largeIcon: const DrawableResourceAndroidBitmap('@mipmap/logo'),
+        color: AppColors.matchaDeep,
         tag: '${notif.type.name}_${notif.relatedId ?? ''}',
       ),
     ),
