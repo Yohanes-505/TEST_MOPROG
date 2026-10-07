@@ -1,11 +1,11 @@
 import 'dart:async';
 
-import 'package:bumble/constants/app_colors.dart';
-import 'package:bumble/controllers/profile_controller.dart';
-import 'package:bumble/profile/profile_setup_screen.dart';
-import 'package:bumble/services/notification_service.dart';
-import 'package:bumble/services/supabase_service.dart';
-import 'package:bumble/services/session_timeout_service.dart';
+import 'package:Meetcha/constants/app_colors.dart';
+import 'package:Meetcha/controllers/profile_controller.dart';
+import 'package:Meetcha/profile/profile_setup_screen.dart';
+import 'package:Meetcha/services/notification_service.dart';
+import 'package:Meetcha/services/supabase_service.dart';
+import 'package:Meetcha/services/session_timeout_service.dart';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';

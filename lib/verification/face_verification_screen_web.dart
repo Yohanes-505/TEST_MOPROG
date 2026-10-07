@@ -1,5 +1,5 @@
-import 'package:bumble/constants/app_colors.dart';
-import 'package:bumble/home/main_shell.dart';
+import 'package:Meetcha/constants/app_colors.dart';
+import 'package:Meetcha/home/main_shell.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 

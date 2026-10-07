@@ -1,9 +1,9 @@
-import 'package:bumble/constants/app_colors.dart';
-import 'package:bumble/controllers/profile_controller.dart';
-import 'package:bumble/home/home_screen.dart';
-import 'package:bumble/profile/profile_tab_screen.dart';
-import 'package:bumble/screens/match_screen.dart';
-import 'package:bumble/services/match_chat_service.dart';
+import 'package:Meetcha/constants/app_colors.dart';
+import 'package:Meetcha/controllers/profile_controller.dart';
+import 'package:Meetcha/home/home_screen.dart';
+import 'package:Meetcha/profile/profile_tab_screen.dart';
+import 'package:Meetcha/screens/match_screen.dart';
+import 'package:Meetcha/services/match_chat_service.dart';
 import 'package:flutter/material.dart';
 
 class MainShell extends StatefulWidget {

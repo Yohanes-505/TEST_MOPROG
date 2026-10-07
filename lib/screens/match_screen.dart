@@ -1,16 +1,14 @@
 import 'dart:async';
 
-import 'package:bumble/constants/app_colors.dart';
-import 'package:bumble/models/match_preview.dart';
-import 'package:bumble/models/profile_model.dart';
-import 'package:bumble/screens/chat_screen.dart';
-import 'package:bumble/screens/likes_screen.dart';
-import 'package:bumble/services/match_chat_service.dart';
-import 'package:bumble/utils/date_label.dart';
-import 'package:bumble/utils/network_error.dart';
-import 'package:bumble/widgets/user_avatar.dart';
-import 'package:bumble/widgets/verified_badge.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:Meetcha/constants/app_colors.dart';
+import 'package:Meetcha/models/match_preview.dart';
+import 'package:Meetcha/models/profile_model.dart';
+import 'package:Meetcha/screens/chat_screen.dart';
+import 'package:Meetcha/screens/likes_screen.dart';
+import 'package:Meetcha/services/match_chat_service.dart';
+import 'package:Meetcha/utils/date_label.dart';
+import 'package:Meetcha/utils/network_error.dart';
+import 'package:Meetcha/widgets/user_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 

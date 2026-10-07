@@ -1,5 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:bumble/services/supabase_service.dart';
+import 'package:Meetcha/services/supabase_service.dart';
 
 class SessionTimeoutService {
   // Ubah sesuai kebutuhan

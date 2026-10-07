@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:bumble/controllers/profile_controller.dart';
+import 'package:Meetcha/controllers/profile_controller.dart';
 
 import 'face_matcher.dart';
 
