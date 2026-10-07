@@ -4,7 +4,6 @@ import 'package:Meetcha/constants/app_colors.dart';
 import 'package:Meetcha/models/match_preview.dart';
 import 'package:Meetcha/models/profile_model.dart';
 import 'package:Meetcha/screens/chat_screen.dart';
-import 'package:Meetcha/screens/likes_screen.dart';
 import 'package:Meetcha/services/match_chat_service.dart';
 import 'package:Meetcha/utils/date_label.dart';
 import 'package:Meetcha/utils/network_error.dart';
@@ -160,20 +159,6 @@ class _MatchChatScreenState extends State<MatchChatScreen> {
         builder: (_) => ChatScreen(
           matchProfile: profile,
         ),
-      ),
-    );
-
-    if (mounted) {
-      _load(
-        showSpinner: false,
-      );
-    }
-  }
-
-  Future<void> _openLikes() async {
-    await Navigator.of(context).push(
-      CupertinoPageRoute(
-        builder: (_) => const LikesScreen(),
       ),
     );
 
@@ -393,8 +378,6 @@ class _MatchChatScreenState extends State<MatchChatScreen> {
         bottom: 28,
       ),
       children: [
-        _buildLikesEntry(),
-
         _SectionHeader(
           title: 'Match Baru',
           count: newMatches.length,
@@ -470,127 +453,6 @@ class _MatchChatScreenState extends State<MatchChatScreen> {
 
         const SizedBox(height: 12),
       ],
-    );
-  }
-
-  Widget _buildLikesEntry() {
-    return Padding(
-      padding:
-          const EdgeInsets.fromLTRB(
-        20,
-        6,
-        20,
-        20,
-      ),
-      child: _Pressable(
-        onTap: _openLikes,
-        child: Container(
-          padding:
-              const EdgeInsets.symmetric(
-            horizontal: 15,
-            vertical: 13,
-          ),
-          decoration: BoxDecoration(
-            color: AppColors.matchaSoft
-                .withValues(
-              alpha: 0.64,
-            ),
-            borderRadius:
-                BorderRadius.circular(
-              18,
-            ),
-            border: Border.all(
-              color: AppColors
-                  .primaryBorder
-                  .withValues(
-                alpha: 0.82,
-              ),
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration:
-                    BoxDecoration(
-                  color: Colors.white
-                      .withValues(
-                    alpha: 0.94,
-                  ),
-                  borderRadius:
-                      BorderRadius
-                          .circular(
-                    14,
-                  ),
-                ),
-                child: const Icon(
-                  Icons.favorite_rounded,
-                  size: 20,
-                  color: AppColors
-                      .matchaDeep,
-                ),
-              ),
-
-              const SizedBox(width: 13),
-
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
-                  children: [
-                    Text(
-                      'Orang yang menyukaimu',
-                      style: TextStyle(
-                        color: AppColors
-                            .textPrimary,
-                        fontSize: 14,
-                        fontWeight:
-                            FontWeight.w700,
-                      ),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      'Lihat siapa yang sudah tertarik denganmu.',
-                      maxLines: 1,
-                      overflow:
-                          TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: AppColors
-                            .textSecondary,
-                        fontSize: 11.5,
-                        height: 1.3,
-                        fontWeight:
-                            FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(width: 8),
-
-              Container(
-                width: 30,
-                height: 30,
-                decoration:
-                    const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons
-                      .arrow_forward_ios_rounded,
-                  size: 12,
-                  color: AppColors
-                      .matchaDeep,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
