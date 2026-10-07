@@ -2,6 +2,8 @@ import 'package:bumble/constants/app_colors.dart';
 import 'package:bumble/models/profile_model.dart';
 import 'package:bumble/screens/match_screen.dart';
 import 'package:bumble/screens/subscription_screen.dart';
+import 'package:bumble/features/gift/gift_shop_screen.dart';
+import 'package:bumble/features/gift/user_inventory_screen.dart';
 import 'package:bumble/services/block_service.dart';
 import 'package:bumble/services/swipe_service.dart';
 import 'package:bumble/widgets/match_dialog.dart';
@@ -24,7 +26,6 @@ class _HomeScreenState extends State<HomeScreen> {
   List<ProfileModel> dailyBrew = [];
 
   bool isLoading = true;
-  final int dailyLimit = 10;
 
   final int dailyLimit = 5;
 
@@ -348,6 +349,29 @@ class _HomeHeader extends StatelessWidget {
               ],
             ),
           ),
+          // Tombol Akses Cepat Gift Shop & Inventory
+          _HeaderButton(
+            icon: Icons.store_rounded,
+            tooltip: 'Gift Shop',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const GiftShopScreen()),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+          _HeaderButton(
+            icon: Icons.inventory_2_rounded,
+            tooltip: 'Inventory Saya',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const UserInventoryScreen()),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
           _HeaderButton(
             icon: Icons.notifications_none_rounded,
             tooltip: 'Match & Pesan',
