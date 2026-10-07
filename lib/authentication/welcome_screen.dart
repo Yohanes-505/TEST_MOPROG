@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
-import 'package:bumble/authentication/login_screen.dart';
-import 'package:bumble/authentication/signup_screen.dart';
-import 'package:bumble/constants/app_colors.dart';
+import 'package:Meetcha/authentication/login_screen.dart';
+import 'package:Meetcha/authentication/signup_screen.dart';
+import 'package:Meetcha/constants/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 

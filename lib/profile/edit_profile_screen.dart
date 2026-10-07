@@ -1,10 +1,10 @@
-import 'package:bumble/constants/app_colors.dart';
-import 'package:bumble/constants/interest_options.dart';
-import 'package:bumble/controllers/profile_controller.dart';
-import 'package:bumble/models/profile_model.dart';
-import 'package:bumble/services/profile_service.dart';
-import 'package:bumble/widgets/interest_selector.dart';
-import 'package:bumble/widgets/photo_grid_picker.dart';
+import 'package:Meetcha/constants/app_colors.dart';
+import 'package:Meetcha/constants/interest_options.dart';
+import 'package:Meetcha/controllers/profile_controller.dart';
+import 'package:Meetcha/models/profile_model.dart';
+import 'package:Meetcha/services/profile_service.dart';
+import 'package:Meetcha/widgets/interest_selector.dart';
+import 'package:Meetcha/widgets/photo_grid_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 

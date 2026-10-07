@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:bumble/constants/app_colors.dart';
+import 'package:Meetcha/constants/app_colors.dart';
 import 'package:flutter/material.dart';
 
 /// Halaman loading penuh dengan latar krem.
