@@ -271,13 +271,26 @@ class MatchChatService {
     return ChatMessage.fromMap(row);
   }
 
+  Future<void> markMessagesRead(ChatRoom room) async {
+    await _client
+        .rpc('mark_messages_read', params: {'p_match_ids': room.matchIds})
+        .timeout(const Duration(seconds: 10));
+  }
+
   RealtimeChannel subscribeToRoom({
     required ChatRoom room,
     required void Function(ChatMessage message) onMessage,
+    void Function(ChatMessage message)? onMessageUpdated,
     void Function(RealtimeSubscribeStatus status, Object? error)? onStatus,
   }) {
     final topic =
         'chat-${room.primaryMatchId}-${DateTime.now().microsecondsSinceEpoch}';
+
+    final filter = PostgresChangeFilter(
+      type: PostgresChangeFilterType.eq,
+      column: 'match_id',
+      value: room.primaryMatchId,
+    );
 
     return _client
         .channel(topic)
@@ -285,13 +298,17 @@ class MatchChatService {
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'messages',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'match_id',
-            value: room.primaryMatchId,
-          ),
+          filter: filter,
           callback: (payload) =>
               onMessage(ChatMessage.fromMap(payload.newRecord)),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'messages',
+          filter: filter,
+          callback: (payload) =>
+              onMessageUpdated?.call(ChatMessage.fromMap(payload.newRecord)),
         )
         .subscribe(onStatus);
   }
