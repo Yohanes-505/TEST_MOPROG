@@ -6,6 +6,7 @@ import 'package:bumble/models/profile_model.dart';
 import 'package:bumble/widgets/interest_selector.dart';
 import 'package:bumble/widgets/photo_grid_picker.dart';
 import 'package:bumble/services/profile_service.dart';
+import 'package:bumble/verification/face_verification_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -250,7 +251,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
       await controller.loadProfile();
 
-      Get.offAll(() => const MainShell());
+      Get.offAll(() => const FaceVerificationScreen(fromOnboarding: true));
     } finally {
       _isFinishing = false;
     }
