@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:bumble/constants/app_colors.dart';
 import 'package:bumble/controllers/profile_controller.dart';
+import 'package:bumble/screens/chat_screen.dart';
+import 'package:bumble/screens/match_screen.dart';
+import 'package:bumble/services/match_chat_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -10,6 +13,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'models/app_notification.dart';
 import 'firebase_options.dart';
 import 'services/notification_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 // import 'package:bumble/profile/profile_setup_screen.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
@@ -21,7 +25,9 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
+  if (!kIsWeb) {
+      FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
+  } 
 
   await Supabase.initialize(
     url: 'https://xwhglyvwosyptwylskmt.supabase.co',
@@ -39,9 +45,20 @@ Future<void> main() async {
     if (nav == null) return;
 
     if (notif.type == AppNotificationType.match) {
-      nav.pushNamed('/matches');
+      nav.push(MaterialPageRoute(builder: (_) => const MatchChatScreen()));
     } else if (notif.type == AppNotificationType.message) {
-      nav.pushNamed('/chat', arguments: notif.relatedId);
+      final matchId = notif.relatedId;
+      if (matchId == null) return;
+
+      MatchChatService().getProfileForMatchId(matchId).then((profile) {
+        if (profile == null) {
+          nav.push(MaterialPageRoute(builder: (_) => const MatchChatScreen()));
+          return;
+        }
+        nav.push(
+          MaterialPageRoute(builder: (_) => ChatScreen(matchProfile: profile)),
+        );
+      });
     }
   };
 

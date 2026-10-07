@@ -5,6 +5,7 @@ import 'package:bumble/screens/chat_screen.dart';
 import 'package:bumble/screens/likes_screen.dart';
 import 'package:bumble/services/match_chat_service.dart';
 import 'package:bumble/utils/date_label.dart';
+import 'package:bumble/utils/network_error.dart';
 import 'package:bumble/widgets/user_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -38,7 +39,10 @@ class _MatchChatScreenState extends State<MatchChatScreen> {
   void initState() {
     super.initState();
     MatchChatService.matchesChanged.addListener(_reloadQuietly);
-    _inboxChannel = _service.subscribeToAnyIncomingMessage(_reloadQuietly);
+    _inboxChannel = _service.subscribeToAnyIncomingMessage(
+      isMyMatch: (matchId) => _items.any((m) => m.matchIds.contains(matchId)),
+      onChange: _reloadQuietly,
+    );
     _load(showSpinner: false); 
   }
 
@@ -75,7 +79,7 @@ class _MatchChatScreenState extends State<MatchChatScreen> {
       if (!mounted || seq != _loadSeq) return;
       setState(() {
         _isLoading = false;
-        if (_items.isEmpty) _error = 'Gagal memuat match & pesan.';
+        if (_items.isEmpty) _error = friendlyError(e);
       });
     }
   }
@@ -125,8 +129,14 @@ class _MatchChatScreenState extends State<MatchChatScreen> {
         children: [
           const SizedBox(height: 160),
           Center(
-            child: Text(_error!,
-                style: const TextStyle(color: AppColors.textSecondary)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
           ),
           Center(
             child: TextButton(onPressed: _load, child: const Text('Coba lagi')),

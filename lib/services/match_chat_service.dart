@@ -1,8 +1,32 @@
 import 'package:bumble/models/chat_message.dart';
 import 'package:bumble/models/match_preview.dart';
 import 'package:bumble/models/profile_model.dart';
+import 'package:bumble/utils/network_error.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+///
+/// Tabel `messages` hanya punya `match_id` (tidak ada receiver_id), jadi
+/// sebelum membaca/mengirim pesan kita perlu tahu id baris `matches`-nya.
+class ChatRoom {
+  final String primaryMatchId;
+  final List<String> matchIds;
+
+  // Ini buat nunjukin kapan match terjadi, fungsinya biar bisa dihitung kadaluarsanya
+  final DateTime? matchedAt;
+
+  const ChatRoom({
+    required this.primaryMatchId,
+    required this.matchIds,
+    this.matchedAt,
+  });
+}
+
+class _MatchRef {
+  final List<String> ids = [];
+  DateTime? matchedAt;
+}
+
 class MatchChatService {
   const MatchChatService();
 
@@ -19,8 +43,8 @@ class MatchChatService {
     final myId = currentUserId;
     if (myId == null) return [];
 
-    final counterparts = _counterparts(await _fetchMatchRows(myId), myId);
-    final profiles = await _fetchProfiles(counterparts.keys);
+    final refs = _groupByCounterpart(await _fetchMatchRows(myId), myId);
+    final profiles = await _fetchProfiles(refs.keys);
     return profiles.values.toList();
   }
 
@@ -28,19 +52,18 @@ class MatchChatService {
     final myId = currentUserId;
     if (myId == null) return [];
 
-    final counterparts = _counterparts(await _fetchMatchRows(myId), myId);
-    if (counterparts.isEmpty) return [];
+    final refs = _groupByCounterpart(await _fetchMatchRows(myId), myId);
+    if (refs.isEmpty) return [];
 
-    final profiles = await _fetchProfiles(counterparts.keys);
+    final profiles = await _fetchProfiles(refs.keys);
 
     final previews = await Future.wait(
-      counterparts.entries
-          .where((e) => profiles.containsKey(e.key))
-          .map((e) async {
-        final last = await _getLastMessage(myId, e.key);
+      refs.entries.where((e) => profiles.containsKey(e.key)).map((e) async {
+        final last = await _getLastMessage(e.value.ids);
         return MatchPreview(
           profile: profiles[e.key]!,
-          matchedAt: e.value,
+          matchedAt: e.value.matchedAt,
+          matchIds: List<String>.unmodifiable(e.value.ids),
           lastMessage: last?.text,
           lastMessageAt: last?.createdAt,
           lastMessageIsMine: last?.senderId == myId,
@@ -61,28 +84,33 @@ class MatchChatService {
   }
 
   Future<List<Map<String, dynamic>>> _fetchMatchRows(String myId) async {
-    final rows = await _client
-        .from('matches')
-        .select()
-        .or('user1_id.eq.$myId,user2_id.eq.$myId');
+    final rows = await withRetry(
+      () async => await _client
+          .from('matches')
+          .select()
+          .or('user1_id.eq.$myId,user2_id.eq.$myId')
+          .order('created_at', ascending: true)
+          .order('id', ascending: true),
+    );
     return List<Map<String, dynamic>>.from(rows);
   }
 
-  Map<String, DateTime?> _counterparts(
+  Map<String, _MatchRef> _groupByCounterpart(
     List<Map<String, dynamic>> rows,
     String myId,
   ) {
-    final result = <String, DateTime?>{};
+    final result = <String, _MatchRef>{};
     for (final row in rows) {
       final a = row['user1_id'].toString();
       final b = row['user2_id'].toString();
       final other = a == myId ? b : a;
-      final at = DateTime.tryParse('${row['created_at']}')?.toLocal();
+      if (other == myId) continue;
+      final ref = result.putIfAbsent(other, () => _MatchRef());
+      ref.ids.add(row['id'].toString());
 
-      final existing = result[other];
-      if (!result.containsKey(other) ||
-          (at != null && (existing == null || at.isAfter(existing)))) {
-        result[other] = at;
+      final at = DateTime.tryParse('${row['created_at']}')?.toLocal();
+      if (at != null && (ref.matchedAt == null || at.isAfter(ref.matchedAt!))) {
+        ref.matchedAt = at;
       }
     }
     return result;
@@ -92,42 +120,106 @@ class MatchChatService {
     final list = ids.toList();
     if (list.isEmpty) return {};
 
-    final rows = await _client.from('profiles').select().inFilter('id', list);
+    final rows = await withRetry(
+      () async => await _client.from('profiles').select().inFilter('id', list),
+    );
     return {
       for (final row in rows) row['id'].toString(): ProfileModel.fromMap(row),
     };
   }
 
-  static String _conversationFilter(String myId, String otherId) =>
-      'and(sender_id.eq.$myId,receiver_id.eq.$otherId),'
-      'and(sender_id.eq.$otherId,receiver_id.eq.$myId)';
-
-  Future<ChatMessage?> _getLastMessage(String myId, String otherId) async {
-    final row = await _client
-        .from('messages')
-        .select()
-        .or(_conversationFilter(myId, otherId))
-        .order('created_at', ascending: false)
-        .limit(1)
-        .maybeSingle();
-    return row == null ? null : ChatMessage.fromMap(row);
+  Future<ChatMessage?> _getLastMessage(List<String> matchIds) async {
+    if (matchIds.isEmpty) return null;
+    try {
+      final row = await withRetry(
+        () async => await _client
+            .from('messages')
+            .select()
+            .inFilter('match_id', matchIds)
+            .order('created_at', ascending: false)
+            .limit(1)
+            .maybeSingle(),
+        attempts: 2,
+      );
+      return row == null ? null : ChatMessage.fromMap(row);
+    } catch (e) {
+      debugPrint('Gagal memuat pesan terakhir: $e');
+      return null;
+    }
   }
 
-  Future<List<ChatMessage>> getMessages(String otherId, {int limit = 200}) async {
+  /// cari profil lawan chat dari sebuah match id 
+  /// dipakai saat notifikasi "prsan baru" / "it's a match!"
+  Future<ProfileModel?> getProfileForMatchId(String matchId) async {
     final myId = currentUserId;
-    if (myId == null) return [];
+    if (myId == null) return null;
 
-    final rows = await _client
-        .from('messages')
-        .select()
-        .or(_conversationFilter(myId, otherId))
-        .order('created_at', ascending: false)
-        .limit(limit);
+    try {
+      final row = await _client
+          .from('matches')
+          .select('user1_id, user2_id')
+          .eq('id', matchId)
+          .maybeSingle();
+      if (row == null) return null;
+
+      final a = row['user1_id'].toString();
+      final b = row['user2_id'].toString();
+      final otherId = a == myId ? b : a;
+      if (otherId == myId) return null;
+
+      final profiles = await _fetchProfiles([otherId]);
+      return profiles[otherId];
+    } catch (e) {
+      debugPrint('Gagal ambil profil dari match_id: $e');
+      return null;
+    }
+  }
+
+  Future<ChatRoom> openRoom(String otherId) async {
+    final myId = currentUserId;
+    if (myId == null) {
+      throw StateError('Sesi berakhir. Silakan login ulang.');
+    }
+
+    final rows = await withRetry(
+      () async => await _client
+          .from('matches')
+          .select('id, created_at')
+          .or(
+            'and(user1_id.eq.$myId,user2_id.eq.$otherId),'
+            'and(user1_id.eq.$otherId,user2_id.eq.$myId)',
+          )
+          .order('created_at', ascending: true)
+          .order('id', ascending: true),
+    );
+
+    final ids = rows.map((r) => r['id'].toString()).toList();
+    if (ids.isEmpty) {
+      throw StateError(
+        'Match dengan pengguna ini tidak ditemukan. Mungkin sudah dihapus.',
+      );
+    }
+    return ChatRoom(
+      primaryMatchId: ids.first,
+      matchIds: ids,
+      matchedAt: DateTime.tryParse('${rows.first['created_at']}')?.toLocal(),
+    );
+  }
+
+  Future<List<ChatMessage>> getMessages(ChatRoom room, {int limit = 200}) async {
+    final rows = await withRetry(
+      () async => await _client
+          .from('messages')
+          .select()
+          .inFilter('match_id', room.matchIds)
+          .order('created_at', ascending: false)
+          .limit(limit),
+    );
     return rows.map(ChatMessage.fromMap).toList();
   }
 
   Future<ChatMessage> sendMessage({
-    required String receiverId,
+    required ChatRoom room,
     required String text,
   }) async {
     final myId = currentUserId;
@@ -138,53 +230,57 @@ class MatchChatService {
     final row = await _client
         .from('messages')
         .insert({
+          'match_id': room.primaryMatchId,
           'sender_id': myId,
-          'receiver_id': receiverId,
-          'message': text,
+          'content': text,
         })
         .select()
-        .single();
+        .single()
+        .timeout(const Duration(seconds: 15));
     return ChatMessage.fromMap(row);
   }
 
-  RealtimeChannel subscribeToIncomingMessages({
-    required String fromUserId,
+  RealtimeChannel subscribeToRoom({
+    required ChatRoom room,
     required void Function(ChatMessage message) onMessage,
+    void Function(RealtimeSubscribeStatus status, Object? error)? onStatus,
   }) {
-    final myId = currentUserId ?? '';
+    final topic =
+        'chat-${room.primaryMatchId}-${DateTime.now().microsecondsSinceEpoch}';
+
     return _client
-        .channel('chat-$myId-$fromUserId')
+        .channel(topic)
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'messages',
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
-            column: 'receiver_id',
-            value: myId,
+            column: 'match_id',
+            value: room.primaryMatchId,
           ),
-          callback: (payload) {
-            final message = ChatMessage.fromMap(payload.newRecord);
-            if (message.senderId == fromUserId) onMessage(message);
-          },
+          callback: (payload) =>
+              onMessage(ChatMessage.fromMap(payload.newRecord)),
         )
-        .subscribe();
+        .subscribe(onStatus);
   }
 
-  RealtimeChannel subscribeToAnyIncomingMessage(VoidCallback onChange) {
-    final myId = currentUserId ?? '';
+  RealtimeChannel subscribeToAnyIncomingMessage({
+    required bool Function(String matchId) isMyMatch,
+    required VoidCallback onChange,
+  }) {
+    final topic = 'inbox-$currentUserId-${DateTime.now().microsecondsSinceEpoch}';
+
     return _client
-        .channel('inbox-$myId')
+        .channel(topic)
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'messages',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'receiver_id',
-            value: myId,
-          ),
-          callback: (_) => onChange(),
+          callback: (payload) {
+            final matchId = payload.newRecord['match_id']?.toString();
+            if (matchId != null && isMyMatch(matchId)) onChange();
+          },
         )
         .subscribe();
   }

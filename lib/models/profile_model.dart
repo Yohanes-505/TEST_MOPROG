@@ -122,10 +122,7 @@ class ProfileModel {
       bio: map['bio'] as String?,
       gender: GenderX.fromDb(map['gender'] as String?),
       photoUrl: map['photo_url'] as String?,
-      photoUrls:(map['photo_urls'] as List?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          const [],
+      photoUrls: _photoUrlsFrom(map),
       interests: (map['interests'] as List?)
               ?.map((e) => e.toString())
               .toList() ??
@@ -203,6 +200,18 @@ class ProfileModel {
       createdAt: createdAt,
       distanceKm: distanceKm,
     );
+  }
+
+  static List<String> _photoUrlsFrom(Map<String, dynamic> map) {
+    final urls = (map['photo_urls'] as List?)
+            ?.map((e) => e.toString())
+            .where((u) => u.isNotEmpty)
+            .toList() ??
+        <String>[];
+    if (urls.isNotEmpty) return urls;
+
+    final single = map['photo_url'] as String?;
+    return (single != null && single.isNotEmpty) ? [single] : <String>[];
   }
 
   static DateTime? _parseDate(dynamic value) {

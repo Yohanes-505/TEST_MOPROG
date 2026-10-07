@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bumble/models/profile_model.dart';
+import 'package:bumble/services/block_service.dart';
 import 'package:bumble/services/swipe_service.dart';
 import 'package:bumble/widgets/match_dialog.dart';
 import 'package:bumble/widgets/profile_card_widget.dart';
@@ -47,10 +48,15 @@ class _HomeScreenState extends State<HomeScreen> {
           .map((e) => e['swiped_id'].toString())
           .toList();
 
+      // User yang sudah saling block gak boleh muncul lagi di swipe
+      final hiddenIds = await BlockService.getHiddenUserIds(myId);
+
+      final excludedIds = {...swipedIds, ...hiddenIds}.toList();
+
       var query = _supabaseClient.from('profiles').select().neq('id', myId);
 
-      if (swipedIds.isNotEmpty) {
-        query = query.not('id', 'in', swipedIds);
+      if (excludedIds.isNotEmpty) {
+        query = query.not('id', 'in', excludedIds);
       }
 
       final result = await query.limit(dailyLimit);
@@ -188,6 +194,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                       handleSwipe(profile, SwipeAction.like),
                                   onPass: () =>
                                       handleSwipe(profile, SwipeAction.dislike),
+                                  onBlocked: () {
+                                    if (mounted) {
+                                      setState(() => dailyBrew
+                                          .removeWhere((p) => p.id == profile.id));
+                                    }
+                                  },
                                 ),
                               );
                             },

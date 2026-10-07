@@ -28,8 +28,7 @@ class AppColors {
   /// Latar tombol utama, chip terpilih, slider aktif.
   static const Color primary = sageLight;
 
-  /// Teks/ikon DI ATAS `primary`.
-  static const Color onPrimary = ink;
+  static const Color ink = Color(0xFF293329);
 
   /// Sage tua turunan `sage` — untuk ikon, teks, dan border di atas latar terang.
   static const Color primaryDeep = Color(0xFF517049);
@@ -45,6 +44,7 @@ class AppColors {
   static const Color background = Color(0xFFFFF9EE);
   static const Color surfaceMuted = cream;
 
+  // Text
   static const Color textPrimary = ink;
   static const Color textSecondary = brown;
 
@@ -52,9 +52,9 @@ class AppColors {
   static const Color border = mist;
   static const Color borderSoft = Color(0xFFF0E4D2);
 
-  // Warna semantik
-  static const Color success = primaryDeep;
-  static const Color successSoft = primarySoft;
+  // Semantic
+  static const Color success = matchaDeep;
+  static const Color successSoft = matchaSoft;
 
   static const Color warning = Color(0xFFB7791F);
   static const Color warningSoft = Color(0xFFFFF4E0);

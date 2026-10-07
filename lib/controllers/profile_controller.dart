@@ -82,10 +82,13 @@ class ProfileController extends GetxController {
     }
   }
 
+/// Upload satu foto tambahan. Bisa dipanggil berkali-kali (mis. dari
+  /// tombol "+ Tambah foto") — setiap panggilan menambah satu foto baru
+  /// ke `profile.photoUrls`, tidak menimpa yang sudah ada.
   Future<bool> uploadPhoto(Uint8List bytes, {String extension = 'jpg'}) async {
     final userId = _profileService.currentUserId;
     if (userId == null) return false;
-
+ 
     isSaving.value = true;
     try {
       final url = await _profileService.uploadPhoto(
@@ -93,10 +96,34 @@ class ProfileController extends GetxController {
         bytes: bytes,
         fileExtension: extension,
       );
-      profile.value = profile.value?.copyWith(photoUrl: url);
+      // Tambahkan foto baru ke daftar yang sudah ada, alih-alih menimpa.
+      final updatedUrls = <String>[...(profile.value?.photoUrls ?? const []), url];
+      profile.value = profile.value?.copyWith(photoUrls: updatedUrls);
       return true;
     } catch (e) {
       _error('Gagal mengunggah foto. Pastikan ukuran file wajar.');
+      return false;
+    } finally {
+      isSaving.value = false;
+    }
+  }
+ 
+  /// Hapus satu foto dari profil (dan dari storage).
+  Future<bool> deletePhoto(String photoUrl) async {
+    final userId = _profileService.currentUserId;
+    if (userId == null) return false;
+ 
+    isSaving.value = true;
+    try {
+      await _profileService.deletePhoto(userId: userId, photoUrl: photoUrl);
+      final updatedUrls =
+          (profile.value?.photoUrls ?? const [])
+              .where((u) => u != photoUrl)
+              .toList();
+      profile.value = profile.value?.copyWith(photoUrls: updatedUrls);
+      return true;
+    } catch (e) {
+      _error('Gagal menghapus foto.');
       return false;
     } finally {
       isSaving.value = false;
