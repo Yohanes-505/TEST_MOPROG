@@ -12,13 +12,71 @@ enum SwipeAction {
   final String dbValue;
 }
 
+/// Hasil swipe dari server.
+class SwipeResult {
+  final bool isMatch;
+
+  /// Sisa like hari ini. `null` = tanpa batas (Premium/VIP).
+  final int? remainingLikes;
+
+  const SwipeResult({required this.isMatch, this.remainingLikes});
+}
+
+/// Dilempar saat user Free sudah menghabiskan jatah like hariannya.
+class SwipeLimitReachedException implements Exception {
+  final int dailyLimit;
+  const SwipeLimitReachedException(this.dailyLimit);
+
+  @override
+  String toString() => 'Batas $dailyLimit like per hari sudah tercapai.';
+}
+
+/// Hasil rewind: id profil yang swipe-nya dibatalkan.
+class RewindResult {
+  final String targetId;
+  final String action;
+  const RewindResult({required this.targetId, required this.action});
+}
+
+class RewindException implements Exception {
+  /// 'upgrade_required' | 'nothing_to_rewind' | 'already_matched' | lainnya
+  final String code;
+  const RewindException(this.code);
+
+  String get message {
+    switch (code) {
+      case 'upgrade_required':
+        return 'Rewind hanya tersedia untuk Premium dan VIP.';
+      case 'nothing_to_rewind':
+        return 'Belum ada swipe yang bisa dibatalkan.';
+      case 'already_matched':
+        return 'Swipe ini sudah jadi match, tidak bisa dibatalkan.';
+      default:
+        return 'Rewind gagal. Coba lagi.';
+    }
+  }
+
+  @override
+  String toString() => message;
+}
+
 class SwipeService {
   const SwipeService();
 
   SupabaseClient get _client => Supabase.instance.client;
 
-  /// Simpan pilihan user. Mengembalikan `true` kalau hasilnya MATCH
+  /// Versi lama (dipakai LikesScreen): mengembalikan `true` kalau MATCH.
   Future<bool> submit({
+    required String targetId,
+    required SwipeAction action,
+  }) async {
+    final result = await submitDetailed(targetId: targetId, action: action);
+    return result.isMatch;
+  }
+
+  /// Simpan pilihan lewat RPC `submit_swipe`. Kuota like harian dicek di
+  /// server, jadi tidak bisa dilewati dengan memodifikasi app.
+  Future<SwipeResult> submitDetailed({
     required String targetId,
     required SwipeAction action,
   }) async {
@@ -27,15 +85,12 @@ class SwipeService {
       throw StateError('Sesi berakhir. Silakan login ulang.');
     }
 
+    final dynamic raw;
     try {
-      await _client.from('swipes').upsert(
-        {
-          'swiper_id': myId,
-          'swiped_id': targetId,
-          'action': action.dbValue,
-        },
-        onConflict: 'swiper_id,swiped_id',
-      );
+      raw = await _client.rpc('submit_swipe', params: {
+        'p_target': targetId,
+        'p_action': action.dbValue,
+      });
     } on PostgrestException catch (e) {
       debugPrint(
         'Gagal menyimpan swipe: [${e.code}] ${e.message} | ${e.details}',
@@ -43,28 +98,42 @@ class SwipeService {
       rethrow;
     }
 
-    if (action != SwipeAction.like) return false;
+    final map = Map<String, dynamic>.from(raw as Map);
 
-    final isMatch = await _matchExists(myId, targetId);
+    if (map['ok'] != true) {
+      switch (map['error']) {
+        case 'limit_reached':
+          throw SwipeLimitReachedException(
+            (map['daily_limit'] as num?)?.toInt() ?? 20,
+          );
+        case 'blocked':
+          throw StateError('Pengguna ini tidak tersedia.');
+        default:
+          throw StateError('Swipe gagal (${map['error']}).');
+      }
+    }
+
+    final isMatch = map['is_match'] == true;
     if (isMatch) MatchChatService.notifyMatchesChanged();
-    return isMatch;
+
+    return SwipeResult(
+      isMatch: isMatch,
+      remainingLikes: (map['remaining_likes'] as num?)?.toInt(),
+    );
   }
 
-  Future<bool> _matchExists(String myId, String otherId) async {
-    try {
-      final rows = await _client
-          .from('matches')
-          .select('id')
-          .or(
-            'and(user1_id.eq.$myId,user2_id.eq.$otherId),'
-            'and(user1_id.eq.$otherId,user2_id.eq.$myId)',
-          )
-          .limit(1);
-      return rows.isNotEmpty;
-    } catch (e) {
-      debugPrint('Gagal memeriksa match: $e');
-      return false;
+  /// Batalkan swipe terakhir (Premium/VIP).
+  Future<RewindResult> rewind() async {
+    final raw = await _client.rpc('rewind_last_swipe');
+    final map = Map<String, dynamic>.from(raw as Map);
+
+    if (map['ok'] != true) {
+      throw RewindException(map['error']?.toString() ?? 'unknown');
     }
+    return RewindResult(
+      targetId: map['target_id'].toString(),
+      action: map['action']?.toString() ?? '',
+    );
   }
 
   Future<List<ProfileModel>> getPendingLikerProfiles(

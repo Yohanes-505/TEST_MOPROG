@@ -1,4 +1,6 @@
+import 'package:bumble/authentication/auth_gate.dart';
 import 'package:bumble/authentication/welcome_screen.dart';
+import 'package:bumble/widgets/meetcha_loading.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:get/get.dart';
@@ -16,11 +18,24 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'models/app_notification.dart';
 import 'firebase_options.dart';
 import 'services/notification_service.dart';
+import 'services/session_timeout_service.dart';
+import 'services/supabase_service.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
+/// Animasi tampil minimal segini supaya tidak berkedip kalau init sangat cepat.
+const Duration _minSplash = Duration(milliseconds: 1200);
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Langsung tampilkan animasi; init berat dikerjakan di dalam _Bootstrap.
+  runApp(const _Bootstrap());
+}
+
+/// Semua inisialisasi yang dulu ada di main().
+Future<void> _initialize() async {
+  final minShow = Future.delayed(_minSplash);
 
   // Firebase
   await Firebase.initializeApp(
@@ -102,11 +117,103 @@ Future<void> main() async {
     permanent: true,
   );
 
-  runApp(const MyApp());
+  await minShow;
 }
 
-class MyApp extends StatelessWidget {
+/// Menampilkan animasi selama init berjalan, lalu berganti ke MyApp.
+class _Bootstrap extends StatefulWidget {
+  const _Bootstrap();
+
+  @override
+  State<_Bootstrap> createState() => _BootstrapState();
+}
+
+class _BootstrapState extends State<_Bootstrap> {
+  late Future<void> _init = _initialize();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: _init,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.done &&
+            !snapshot.hasError) {
+          return const MyApp();
+        }
+
+        if (snapshot.hasError) {
+          debugPrint('Init gagal: ${snapshot.error}');
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: Scaffold(
+              backgroundColor: AppColors.cream,
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Gagal memulai aplikasi.\nPeriksa koneksi internetmu.',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () => setState(() => _init = _initialize()),
+                        child: const Text('Coba lagi'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return const MaterialApp(
+          debugShowCheckedModeBanner: false,
+          home: MeetchaLoadingScreen(),
+        );
+      },
+    );
+  }
+}
+
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (supabase.auth.currentSession == null) return;
+
+    if (state == AppLifecycleState.paused) {
+      SessionTimeoutService.touch(); // catat saat keluar
+    } else if (state == AppLifecycleState.resumed) {
+      SessionTimeoutService.checkExpiredAndLogout().then((expired) {
+        if (expired) {
+          Get.offAll(() => const WelcomeScreen());
+        } else {
+          SessionTimeoutService.touch();
+        }
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -115,7 +222,7 @@ class MyApp extends StatelessWidget {
       title: 'Meetcha',
       theme: _meetchaTheme,
       debugShowCheckedModeBanner: false,
-      home: const WelcomeScreen(),
+      home: const AuthGate(),
     );
   }
 }

@@ -1,0 +1,10 @@
+[33m9153ddc[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mnicho[m[33m)[m feat(welcome): latar welcome screen pakai brown 6F5840
+[33mb78fa4b[m refactor(ui): selaraskan semua warna app dengan palet
+[33m28e4e4d[m feat(theme): ganti color palette ke palet baru
+[33mf4708da[m Likes, Match, Chat Feature and Database Fixing
+[33mf0d761f[m Likes, Match, Chat Feature and Database Fixing
+[33mce58e14[m Merge pull request #22 from Yohanes-505/Khresnanda
+[33m5ef9a9c[m style: apply Meetcha palette to subscription and wallet screens
+[33m9dd5679[m Merge remote-tracking branch 'origin/main' into Khresnanda
+[33m40af2a0[m style: apply Meetcha palette to profile module and fix lime contrast
+[33mb434a41[m style: apply Meetcha palette to home, chat, match, and likes
