@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bumble/models/chat_message.dart';
 import 'package:bumble/models/match_preview.dart';
 import 'package:bumble/models/profile_model.dart';
@@ -59,7 +61,8 @@ class MatchChatService {
 
     final previews = await Future.wait(
       refs.entries.where((e) => profiles.containsKey(e.key)).map((e) async {
-        final last = await _getLastMessage(e.value.ids);
+        final res = await _getLastMessage(e.value.ids);
+        final last = res.message;
         return MatchPreview(
           profile: profiles[e.key]!,
           matchedAt: e.value.matchedAt,
@@ -67,11 +70,18 @@ class MatchChatService {
           lastMessage: last?.text,
           lastMessageAt: last?.createdAt,
           lastMessageIsMine: last?.senderId == myId,
+          activityKnown: res.ok,
         );
       }),
     );
 
     final list = previews.toList();
+    
+    if (list.any((p) => p.isExpired)) {
+      list.removeWhere((p) => p.isExpired);
+      unawaited(purgeExpiredMatches());
+    }
+
     list.sort((a, b) {
       final ta = a.lastMessageAt ?? a.matchedAt;
       final tb = b.lastMessageAt ?? b.matchedAt;
@@ -128,8 +138,10 @@ class MatchChatService {
     };
   }
 
-  Future<ChatMessage?> _getLastMessage(List<String> matchIds) async {
-    if (matchIds.isEmpty) return null;
+  Future<({ChatMessage? message, bool ok})> _getLastMessage(
+    List<String> matchIds,
+  ) async {
+    if (matchIds.isEmpty) return (message: null, ok: true);
     try {
       final row = await withRetry(
         () async => await _client
@@ -141,10 +153,21 @@ class MatchChatService {
             .maybeSingle(),
         attempts: 2,
       );
-      return row == null ? null : ChatMessage.fromMap(row);
+      return (
+        message: row == null ? null : ChatMessage.fromMap(row),
+        ok: true,
+      );
     } catch (e) {
       debugPrint('Gagal memuat pesan terakhir: $e');
-      return null;
+      return (message: null, ok: false);
+    }
+  }
+
+  Future<void> purgeExpiredMatches() async {
+    try {
+      await _client.rpc('expire_my_idle_matches');
+    } catch (e) {
+      debugPrint('Gagal menghapus match kadaluarsa: $e');
     }
   }
 
@@ -199,10 +222,18 @@ class MatchChatService {
         'Match dengan pengguna ini tidak ditemukan. Mungkin sudah dihapus.',
       );
     }
+    DateTime? matchedAt;
+    for (final r in rows) {
+      final at = DateTime.tryParse('${r['created_at']}')?.toLocal();
+      if (at != null && (matchedAt == null || at.isAfter(matchedAt))) {
+        matchedAt = at;
+      }
+    }
+
     return ChatRoom(
       primaryMatchId: ids.first,
       matchIds: ids,
-      matchedAt: DateTime.tryParse('${rows.first['created_at']}')?.toLocal(),
+      matchedAt: matchedAt,
     );
   }
 
