@@ -1,4 +1,4 @@
-import 'package:bumble/constants/app_colors.dart';
+import 'package:Meetcha/constants/app_colors.dart';
 import 'package:flutter/material.dart';
 
 /// Node flowchart: "Safe Dating Tips (Konten Statis)".

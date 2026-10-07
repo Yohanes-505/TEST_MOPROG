@@ -1,5 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:bumble/models/profile_model.dart';
+import 'package:Meetcha/models/profile_model.dart';
 
 class TierStatus {
   final String tier;

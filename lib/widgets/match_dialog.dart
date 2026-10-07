@@ -1,8 +1,8 @@
-import 'package:bumble/constants/app_colors.dart';
-import 'package:bumble/controllers/profile_controller.dart';
-import 'package:bumble/models/profile_model.dart';
-import 'package:bumble/screens/chat_screen.dart';
-import 'package:bumble/widgets/user_avatar.dart';
+import 'package:Meetcha/constants/app_colors.dart';
+import 'package:Meetcha/controllers/profile_controller.dart';
+import 'package:Meetcha/models/profile_model.dart';
+import 'package:Meetcha/screens/chat_screen.dart';
+import 'package:Meetcha/widgets/user_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 

@@ -1,11 +1,11 @@
-import 'package:bumble/constants/app_colors.dart';
-import 'package:bumble/models/profile_model.dart';
-import 'package:bumble/screens/match_screen.dart';
-import 'package:bumble/screens/subscription_screen.dart';
-import 'package:bumble/services/block_service.dart';
-import 'package:bumble/services/swipe_service.dart';
-import 'package:bumble/widgets/match_dialog.dart';
-import 'package:bumble/widgets/profile_card_widget.dart';
+import 'package:Meetcha/constants/app_colors.dart';
+import 'package:Meetcha/models/profile_model.dart';
+import 'package:Meetcha/screens/match_screen.dart';
+import 'package:Meetcha/screens/subscription_screen.dart';
+import 'package:Meetcha/services/block_service.dart';
+import 'package:Meetcha/services/swipe_service.dart';
+import 'package:Meetcha/widgets/match_dialog.dart';
+import 'package:Meetcha/widgets/profile_card_widget.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -24,7 +24,6 @@ class _HomeScreenState extends State<HomeScreen> {
   List<ProfileModel> dailyBrew = [];
 
   bool isLoading = true;
-  final int dailyLimit = 10;
 
   final SwipeService _swipeService = const SwipeService();
 
@@ -346,6 +345,29 @@ class _HomeHeader extends StatelessWidget {
               ],
             ),
           ),
+          // Tombol Akses Cepat Gift Shop & Inventory
+          _HeaderButton(
+            icon: Icons.store_rounded,
+            tooltip: 'Gift Shop',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const GiftShopScreen()),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+          _HeaderButton(
+            icon: Icons.inventory_2_rounded,
+            tooltip: 'Inventory Saya',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const UserInventoryScreen()),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
           _HeaderButton(
             icon: Icons.notifications_none_rounded,
             tooltip: 'Match & Pesan',

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:bumble/authentication/welcome_screen.dart';
-import 'package:bumble/home/main_shell.dart';
-import 'package:bumble/profile/profile_setup_screen.dart';
-import 'package:bumble/services/profile_service.dart';
-import 'package:bumble/services/supabase_service.dart';
-import 'package:bumble/services/session_timeout_service.dart';
-import 'package:bumble/constants/app_colors.dart';
+import 'package:Meetcha/authentication/welcome_screen.dart';
+import 'package:Meetcha/home/main_shell.dart';
+import 'package:Meetcha/profile/profile_setup_screen.dart';
+import 'package:Meetcha/services/profile_service.dart';
+import 'package:Meetcha/services/supabase_service.dart';
+import 'package:Meetcha/services/session_timeout_service.dart';
+import 'package:Meetcha/constants/app_colors.dart';
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
