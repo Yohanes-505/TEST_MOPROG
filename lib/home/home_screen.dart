@@ -8,6 +8,7 @@ import 'package:bumble/services/block_service.dart';
 import 'package:bumble/services/swipe_service.dart';
 import 'package:bumble/widgets/match_dialog.dart';
 import 'package:bumble/widgets/profile_card_widget.dart';
+import 'package:bumble/screens/subscription_screen.dart';
 
 final _supabaseClient = Supabase.instance.client;
 
@@ -21,7 +22,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<ProfileModel> dailyBrew = [];
   bool isLoading = true;
-  final int dailyLimit = 5;
 
   final SwipeService _swipeService = const SwipeService();
 
@@ -77,6 +77,7 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     } catch (e) {
+      debugPrint('Error fetching daily brew: $e');
       if (mounted) setState(() => isLoading = false);
       Get.snackbar(
         'Error',
@@ -86,25 +87,21 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Panggil fungsi ini saat user klik tombol Like / Pass (atau nge-swipe)
   Future<void> handleSwipe(ProfileModel profile, SwipeAction action) async {
     if (_busyIds.contains(profile.id)) return;
+
     setState(() => _busyIds.add(profile.id));
 
     try {
-      // Simpan pilihan; kalau Like dan orang itu sudah lebih dulu like kita,
-      // match dibuat dan `isMatch` bernilai true.
-      final isMatch = await _swipeService.submit(
+      // Gunakan submitDetailed dari SwipeService baru
+      final result = await _swipeService.submitDetailed(
         targetId: profile.id,
         action: action,
       );
 
-      if (mounted) {
-        setState(() {
-          dailyBrew.removeWhere((p) => p.id == profile.id);
-        });
-      }
-
-      if (isMatch) {
+      // Jika saling like, panggil MatchDialog milikmu
+      if (result.isMatch) {
         await showMatchDialog(profile);
       } else if (action == SwipeAction.like) {
         Get.snackbar(
@@ -113,12 +110,32 @@ class _HomeScreenState extends State<HomeScreen> {
           snackPosition: SnackPosition.BOTTOM,
         );
       }
-    } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Something went wrong',
-        snackPosition: SnackPosition.BOTTOM,
+
+      // Hapus dari UI
+      if (mounted) {
+        setState(() {
+          dailyBrew.removeWhere((p) => p.id == profile.id);
+        });
+      }
+
+      // Muat ulang kalau layar sudah kosong
+      if (dailyBrew.isEmpty) fetchDailyBrew();
+
+    } on SwipeLimitReachedException catch (e) {
+      // Tampilkan popup minta upgrade
+      Get.defaultDialog(
+        title: 'Limit Harian Tercapai',
+        middleText: '${e.toString()}\n\nUpgrade ke Premium/VIP untuk swipe tanpa batas!',
+        textConfirm: 'Lihat Paket',
+        textCancel: 'Nanti',
+        confirmTextColor: Colors.white,
+        onConfirm: () {
+          Get.back(); // Tutup pop-up dialognya dulu
+          Get.to(() => const SubscriptionScreen()); // Lempar ke halaman Subscription
+        },
       );
+    } catch (e) {
+      Get.snackbar('Gagal', e.toString(), snackPosition: SnackPosition.BOTTOM);
     } finally {
       if (mounted) setState(() => _busyIds.remove(profile.id));
     }
@@ -191,9 +208,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   borderRadius: BorderRadius.circular(16),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.1,
-                                      ),
+                                      color: Colors.black.withOpacity(0.1),
                                       blurRadius: 8,
                                       offset: const Offset(0, 4),
                                     ),
