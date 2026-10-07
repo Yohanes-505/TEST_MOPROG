@@ -1,3 +1,4 @@
+import 'package:bumble/authentication/auth_gate.dart';
 import 'package:bumble/authentication/welcome_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -16,6 +17,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'models/app_notification.dart';
 import 'firebase_options.dart';
 import 'services/notification_service.dart';
+import 'services/session_timeout_service.dart';
+import 'services/supabase_service.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
@@ -105,8 +108,41 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (supabase.auth.currentSession == null) return;
+
+    if (state == AppLifecycleState.paused) {
+      SessionTimeoutService.touch(); // catat saat keluar
+    } else if (state == AppLifecycleState.resumed) {
+      SessionTimeoutService.checkExpiredAndLogout().then((expired) {
+        if (expired) {
+          Get.offAll(() => const WelcomeScreen());
+        } else {
+          SessionTimeoutService.touch();
+        }
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -115,7 +151,7 @@ class MyApp extends StatelessWidget {
       title: 'Meetcha',
       theme: _meetchaTheme,
       debugShowCheckedModeBanner: false,
-      home: const WelcomeScreen(),
+      home: const AuthGate(),
     );
   }
 }

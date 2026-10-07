@@ -8,6 +8,7 @@ import 'package:bumble/profile/profile_setup_screen.dart';
 import 'package:bumble/services/notification_service.dart';
 import 'package:bumble/services/profile_service.dart';
 import 'package:bumble/services/supabase_service.dart';
+import 'package:bumble/services/session_timeout_service.dart';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -69,8 +70,9 @@ class _LoginScreenState extends State<LoginScreen>
       );
 
       if (response.user != null) {
+        await SessionTimeoutService.touch();
+
         // FCM token hanya disimpan dari mobile.
-        // Chrome sementara kita gunakan untuk development UI.
         if (!kIsWeb) {
           unawaited(saveCurrentFcmToken());
         }
