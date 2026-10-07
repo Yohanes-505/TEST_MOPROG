@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bumble/profile/profile_setup_screen.dart';
+import 'package:bumble/controllers/profile_controller.dart';
 import 'package:bumble/services/notification_service.dart';
 
 class SignUpScreen extends StatefulWidget {
@@ -32,56 +33,91 @@ class SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
+  static final RegExp _emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+
   Future<void> handleSignUp() async {
-    if (nameController.text.isEmpty ||
-        emailController.text.isEmpty ||
-        passwordController.text.isEmpty) {
+    if (isLoading) return;
+    FocusScope.of(context).unfocus();
+
+    final name = nameController.text.trim();
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+    final confirmPassword = confirmPasswordController.text.trim();
+
+    if (name.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
       Get.snackbar('Error', 'Please fill in all fields', snackPosition: SnackPosition.BOTTOM);
       return;
     }
 
-    if (passwordController.text != confirmPasswordController.text) {
-      Get.snackbar('Error', 'Passwords do not match', snackPosition: SnackPosition.BOTTOM);
+    if (!_emailRegex.hasMatch(email)) {
+      Get.snackbar('Error', 'Please enter a valid email address', snackPosition: SnackPosition.BOTTOM);
       return;
     }
 
-    if (passwordController.text.length < 6) {
+    if (password.length < 6) {
       Get.snackbar('Error', 'Password must be at least 6 characters', snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+
+    if (password != confirmPassword) {
+      Get.snackbar('Error', 'Passwords do not match', snackPosition: SnackPosition.BOTTOM);
       return;
     }
 
     setState(() => isLoading = true);
 
     try {
+      // Nama, email, dan passwordnya disimpan ke metadata biar informasinya tidak hilang walau belum konfirmasi e-mailnya
       final response = await supabase.auth.signUp(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
+        email: email,
+        password: password,
+        data: {'name': name},
       );
 
-      if (response.user != null) {
-        // Simpan data tambahan (nama) ke tabel profiles
-        await supabase.from('profiles').insert({
-          'id': response.user!.id,
-          'name': nameController.text.trim(),
-          'created_at': DateTime.now().toIso8601String(),
-        });
-        if(response.session == null) {
-          Get.snackbar('Verify your email', 'We sent a confirmation link to your email. Please verify your email before logging in.', snackPosition: SnackPosition.BOTTOM);
-          Get.back(); // balik ke Login Screen setelah sign up
-        } else {
-
-          unawaited(saveCurrentFcmToken());
-
-          Get.snackbar('Success', 'Account created successfully!');
-          Get.offAll(() => const ProfileSetupScreen()); // balik ke Login Screen setelah sign up
-        }
+      final user = response.user;
+      if (user == null) {
+        Get.snackbar('Error', 'Sign up failed. Please try again.', snackPosition: SnackPosition.BOTTOM);
+        return;
       }
+      
+      if (user.identities != null && user.identities!.isEmpty) {
+        Get.snackbar('Error', 'This email is already registered. Please log in instead.',
+            snackPosition: SnackPosition.BOTTOM);
+        return;
+      }
+
+      if (response.session == null) {
+        Get.snackbar(
+          'Verify your email',
+          'We sent a confirmation link to your email. Please verify your email before logging in.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        Get.back(); // ini buat balik ke Login Screen
+        return;
+      }
+
+      try {
+        await supabase.from('profiles').upsert({
+          'id': user.id,
+          'name': name,
+        });
+      } catch (e) {
+        debugPrint('SIGNUP PROFILE UPSERT ERROR: $e');
+      }
+
+      unawaited(saveCurrentFcmToken());
+
+      await ProfileController.to.loadProfile();
+
+      Get.snackbar('Success', 'Account created successfully!', snackPosition: SnackPosition.BOTTOM);
+      Get.offAll(() => const ProfileSetupScreen());
     } on AuthException catch (e) {
-      Get.snackbar('Error', e.message);
+      Get.snackbar('Error', e.message, snackPosition: SnackPosition.BOTTOM);
     } catch (e) {
-      Get.snackbar('Error', 'Something went wrong. Please try again.');
+      debugPrint('SIGNUP ERROR: $e');
+      Get.snackbar('Error', 'Something went wrong. Please try again.', snackPosition: SnackPosition.BOTTOM);
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
     }
   }
   InputDecoration _inputDecoration({

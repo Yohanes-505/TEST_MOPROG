@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:bumble/models/profile_model.dart';
 import 'package:flutter/foundation.dart';
 import 'package:bumble/services/location_service.dart';
@@ -43,6 +41,7 @@ class ProfileController extends GetxController {
     try {
       profile.value = await _profileService.getMyProfile();
     } catch (e) {
+      debugPrint('LOAD PROFILE ERROR: $e');
       _error('Gagal memuat profil.');
     } finally {
       isLoading.value = false;
