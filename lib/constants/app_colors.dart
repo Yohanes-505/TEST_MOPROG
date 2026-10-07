@@ -1,56 +1,49 @@
 import 'package:flutter/material.dart';
 
-/// Palet Meetcha. Lima warna inti dari palet desain:
-/// tan 9E7C5F, brown 6F5840, sage 658C5E, sage light 91A287, cream FFF0D6.
-/// Warna lain (ink, soft, border) adalah turunan dari kelimanya
-/// supaya kontras teks tetap terbaca.
+/// Central color palette for Meetcha.
 class AppColors {
   AppColors._();
 
-  // Warna inti (palet desain)
+  // Core palette
   static const Color tan = Color(0xFF9E7C5F);
   static const Color brown = Color(0xFF6F5840);
-  static const Color sage = Color(0xFF658C5E);
-  static const Color sageLight = Color(0xFF91A287);
+
+  static const Color matcha = Color(0xFF658C5E);
+  static const Color matchaDeep = Color(0xFF4F6B48);
+  static const Color sage = Color(0xFF91A287);
+  static const Color matchaSoft = Color(0xFFDDE6D5);
+
   static const Color cream = Color(0xFFFFF0D6);
 
-  // Alias nama lama supaya file yang belum diperbarui tetap bisa dikompilasi.
-  static const Color lime = sageLight;
-  static const Color green = sage;
-
-  /// Cokelat tua turunan `brown` — latar gelap (welcome) dan teks utama.
-  static const Color espresso = Color(0xFF3B2818);
-  static const Color ink = espresso;
-
-  /// Cokelat muda turunan `tan` — garis pemisah & border netral.
-  static const Color mist = Color(0xFFDCCBB5);
-
-  /// Latar tombol utama, chip terpilih, slider aktif.
-  static const Color primary = sageLight;
-
+  // Main text
   static const Color ink = Color(0xFF293329);
 
-  /// Sage tua turunan `sage` — untuk ikon, teks, dan border di atas latar terang.
-  static const Color primaryDeep = Color(0xFF517049);
+  // Legacy aliases
+  // Tetap dipertahankan karena beberapa screen lama masih memakainya.
+  static const Color lime = matcha;
+  static const Color green = sage;
+  static const Color sageLight = sage;
+  static const Color mist = Color(0xFFD8DED3);
 
-  /// Latar lembut bernuansa sage.
-  static const Color primarySoft = Color(0xFFEAF0E5);
+  // Brand / primary
+  static const Color primary = matcha;
+  static const Color onPrimary = Colors.white;
 
-  /// Border tipis bernuansa sage.
-  static const Color primaryBorder = Color(0xFFCBD7C3);
+  static const Color primaryDeep = matchaDeep;
+  static const Color primarySoft = matchaSoft;
+  static const Color primaryBorder = Color(0xFFC6D5BD);
 
-  /// Latar halaman: cream yang dilembutkan. `cream` murni dipakai untuk
-  /// permukaan yang perlu menonjol (chip, kartu, area muted).
-  static const Color background = Color(0xFFFFF9EE);
-  static const Color surfaceMuted = cream;
+  // Backgrounds
+  static const Color background = Color(0xFFFFFBF3);
+  static const Color surfaceMuted = Color(0xFFF3F5EF);
 
   // Text
   static const Color textPrimary = ink;
-  static const Color textSecondary = brown;
+  static const Color textSecondary = Color(0xFF687065);
 
-  /// Garis pemisah & border netral (hangat).
-  static const Color border = mist;
-  static const Color borderSoft = Color(0xFFF0E4D2);
+  // Borders
+  static const Color border = Color(0xFFD8DED3);
+  static const Color borderSoft = Color(0xFFEAEFE7);
 
   // Semantic
   static const Color success = matchaDeep;
