@@ -105,7 +105,7 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 flutter_launcher_icons:
-  android: "logo"          # manifest Anda memakai @mipmap/logo
+  android: "logo"          
   ios: true
   image_path: "images/app_icon.png"
   adaptive_icon_background: "#6F5840"
