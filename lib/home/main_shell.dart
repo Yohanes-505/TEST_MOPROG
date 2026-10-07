@@ -2,6 +2,8 @@ import 'package:Meetcha/constants/app_colors.dart';
 import 'package:Meetcha/controllers/profile_controller.dart';
 import 'package:Meetcha/home/home_screen.dart';
 import 'package:Meetcha/profile/profile_tab_screen.dart';
+import 'package:Meetcha/home/single_profile_view.dart';
+import 'package:Meetcha/screens/likes_screen.dart';
 import 'package:Meetcha/screens/match_screen.dart';
 import 'package:Meetcha/services/match_chat_service.dart';
 import 'package:flutter/material.dart';
@@ -16,10 +18,22 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _index = 0;
 
-  final List<Widget> _tabs = const [
-    HomeScreen(),
-    MatchChatScreen(),
-    ProfileTabScreen(),
+  /// Dinaikkan setiap kali tab Likes dibuka, supaya daftar "yang menyukaimu"
+  /// dimuat ulang (key baru = state baru).
+  int _likesVersion = 0;
+
+  /// Item nav: 0 Brew, 1 Suggested, 2 Likes, 3 Match, 4 Profile.
+  /// Item 0 dan 1 memakai SATU HomeScreen (beda mode saja), jadi halaman
+  /// yang tampil hanya 4 dan indeks halaman = [_pageFor].
+  int _pageFor(int navIndex) => navIndex <= 1 ? 0 : navIndex - 1;
+
+  List<Widget> get _tabs => [
+    HomeScreen(
+      mode: _index == 1 ? HomeViewMode.single : HomeViewMode.scroll,
+    ),
+    LikesScreen(key: ValueKey('likes-$_likesVersion'), showBack: false),
+    const MatchChatScreen(),
+    const ProfileTabScreen(),
   ];
 
   @override
@@ -36,20 +50,23 @@ class _MainShellState extends State<MainShell> {
 
     setState(() {
       _index = index;
+      if (index == 2) _likesVersion++;
     });
 
-    if (index == 1) {
+    if (index == 3) {
       MatchChatService.notifyMatchesChanged();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final tabs = _tabs;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
-        children: List.generate(_tabs.length, (index) {
-          final isSelected = _index == index;
+        children: List.generate(tabs.length, (index) {
+          final isSelected = _pageFor(_index) == index;
 
           return Positioned.fill(
             child: IgnorePointer(
@@ -64,7 +81,7 @@ class _MainShellState extends State<MainShell> {
                     offset: isSelected ? Offset.zero : const Offset(0, 0.008),
                     duration: const Duration(milliseconds: 260),
                     curve: Curves.easeOutCubic,
-                    child: _tabs[index],
+                    child: tabs[index],
                   ),
                 ),
               ),
@@ -111,7 +128,7 @@ class _MeetchaBottomNavigation extends StatelessWidget {
         ),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            const itemCount = 3;
+            const itemCount = 5;
             final itemWidth = constraints.maxWidth / itemCount;
 
             return Stack(
@@ -149,11 +166,29 @@ class _MeetchaBottomNavigation extends StatelessWidget {
                     ),
                     Expanded(
                       child: _NavigationItem(
-                        icon: Icons.favorite_border_rounded,
-                        selectedIcon: Icons.favorite_rounded,
-                        label: 'Match',
+                        icon: Icons.person_search_outlined,
+                        selectedIcon: Icons.person_search_rounded,
+                        label: 'Suggested',
                         selected: selectedIndex == 1,
                         onTap: () => onChanged(1),
+                      ),
+                    ),
+                    Expanded(
+                      child: _NavigationItem(
+                        icon: Icons.favorite_border_rounded,
+                        selectedIcon: Icons.favorite_rounded,
+                        label: 'Likes',
+                        selected: selectedIndex == 2,
+                        onTap: () => onChanged(2),
+                      ),
+                    ),
+                    Expanded(
+                      child: _NavigationItem(
+                        icon: Icons.chat_bubble_outline_rounded,
+                        selectedIcon: Icons.chat_bubble_rounded,
+                        label: 'Match',
+                        selected: selectedIndex == 3,
+                        onTap: () => onChanged(3),
                       ),
                     ),
                     Expanded(
@@ -161,8 +196,8 @@ class _MeetchaBottomNavigation extends StatelessWidget {
                         icon: Icons.person_outline_rounded,
                         selectedIcon: Icons.person_rounded,
                         label: 'Profile',
-                        selected: selectedIndex == 2,
-                        onTap: () => onChanged(2),
+                        selected: selectedIndex == 4,
+                        onTap: () => onChanged(4),
                       ),
                     ),
                   ],
@@ -219,7 +254,7 @@ class _NavigationItemState extends State<_NavigationItem> {
         duration: const Duration(milliseconds: 90),
         curve: Curves.easeOut,
         child: SizedBox.expand(
-          child: Row(
+          child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               AnimatedScale(
@@ -245,14 +280,14 @@ class _NavigationItemState extends State<_NavigationItem> {
                   child: Icon(
                     widget.selected ? widget.selectedIcon : widget.icon,
                     key: ValueKey(widget.selected),
-                    size: 21,
+                    size: 23,
                     color: widget.selected
                         ? AppColors.matchaDeep
                         : AppColors.textSecondary,
                   ),
                 ),
               ),
-              const SizedBox(width: 7),
+              const SizedBox(height: 4),
               AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 220),
                 curve: Curves.easeOutCubic,
@@ -260,13 +295,16 @@ class _NavigationItemState extends State<_NavigationItem> {
                   color: widget.selected
                       ? AppColors.matchaDeep
                       : AppColors.textSecondary,
-                  fontSize: 12.5,
+                  fontSize: 11,
                   height: 1,
                   fontWeight: widget.selected
                       ? FontWeight.w700
                       : FontWeight.w600,
                 ),
-                child: Text(widget.label),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(widget.label),
+                ),
               ),
             ],
           ),

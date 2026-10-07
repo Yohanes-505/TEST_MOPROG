@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:Meetcha/models/chat_message.dart';
 import 'package:Meetcha/models/match_preview.dart';
 import 'package:Meetcha/models/profile_model.dart';
+import 'package:Meetcha/services/block_service.dart';
 import 'package:Meetcha/utils/network_error.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';

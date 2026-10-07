@@ -1,14 +1,18 @@
 import 'package:Meetcha/constants/app_colors.dart';
+import 'package:Meetcha/controllers/profile_controller.dart';
 import 'package:Meetcha/models/profile_model.dart';
 import 'package:Meetcha/screens/match_screen.dart';
 import 'package:Meetcha/screens/subscription_screen.dart';
 import 'package:Meetcha/services/block_service.dart';
+import 'package:Meetcha/services/profile_service.dart';
 import 'package:Meetcha/services/swipe_service.dart';
 import 'package:Meetcha/widgets/match_dialog.dart';
 import 'package:Meetcha/widgets/profile_card_widget.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
+import 'package:Meetcha/home/single_profile_view.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:Meetcha/features/gift/gift_shop_screen.dart';
 import 'package:Meetcha/features/gift/user_inventory_screen.dart';
@@ -16,17 +20,40 @@ import 'package:Meetcha/features/gift/user_inventory_screen.dart';
 final _supabaseClient = Supabase.instance.client;
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  /// `scroll` = daftar Daily Brew (tab Brew),
+  /// `single` = 1 profil per layar (tab Suggested).
+  /// Dua tab memakai State yang sama, jadi datanya tidak ganda.
+  final HomeViewMode mode;
+
+  const HomeScreen({super.key, this.mode = HomeViewMode.scroll});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  /// Daftar untuk tab Brew (maks. [dailyLimit] profil).
   List<ProfileModel> dailyBrew = [];
+
+  /// Daftar untuk tab Suggested. Sebisa mungkin berisi orang yang
+  /// BERBEDA dari [dailyBrew] (lihat fetchDailyBrew).
+  List<ProfileModel> suggested = [];
 
   bool isLoading = true;
   final int dailyLimit = 5;
+  final int suggestedLimit = 10;
+
+  /// Daftar yang sedang ditampilkan sesuai tab aktif.
+  List<ProfileModel> get _activeList =>
+      widget.mode == HomeViewMode.single ? suggested : dailyBrew;
+
+  /// Hapus profil dari kedua daftar. Perlu kalau orang yang sama
+  /// kebetulan ada di Brew dan Suggested, supaya tidak di-swipe dua kali.
+  /// Panggil di dalam setState.
+  void _removeFromAll(ProfileModel profile) {
+    dailyBrew.removeWhere((item) => item.id == profile.id);
+    suggested.removeWhere((item) => item.id == profile.id);
+  }
 
   final SwipeService _swipeService = const SwipeService();
 
@@ -34,10 +61,91 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Digunakan untuk mencegah tap ganda.
   final Set<String> _busyIds = {};
 
+  void _removeProfile(ProfileModel profile) {
+    if (!mounted) return;
+    setState(() {
+      _removeFromAll(profile);
+    });
+  }
+
+  Widget _buildSingleView() {
+    final profile = suggested.first;
+    return SingleProfileView(
+      // Key per profil: foto & state reset, dan AnimatedSwitcher
+      // menganimasikan pergantian ke profil berikutnya.
+      key: ValueKey('single-${profile.id}'),
+      profile: profile,
+      remaining: suggested.length,
+      actionsEnabled: !_busyIds.contains(profile.id),
+      onSwipe: (action) => handleSwipe(profile, action),
+      onBlocked: () => _removeProfile(profile),
+      onRefresh: () => fetchDailyBrew(showLoader: false),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
     fetchDailyBrew();
+
+    // Kalau user mengubah filter preferensi (gender, usia, jarak) di tab
+    // Profile, Home dimuat ulang supaya hasilnya langsung ikut berubah.
+    _lastPrefSignature = _prefSignature(ProfileController.to.me);
+    _prefsWorker = ever<ProfileModel?>(ProfileController.to.profile, (p) {
+      final signature = _prefSignature(p);
+      if (signature == null) return;
+
+      final changed =
+          _lastPrefSignature != null && signature != _lastPrefSignature;
+      _lastPrefSignature = signature;
+
+      if (changed) fetchDailyBrew();
+    });
+  }
+
+  @override
+  void dispose() {
+    _prefsWorker?.dispose();
+    super.dispose();
+  }
+
+  Worker? _prefsWorker;
+  String? _lastPrefSignature;
+
+  /// Ringkasan filter preferensi. Sengaja TIDAK memuat koordinat, supaya
+  /// update GPS otomatis tidak memicu pemuatan ulang.
+  String? _prefSignature(ProfileModel? p) {
+    if (p == null) return null;
+    return '${p.prefGender?.dbValue}|${p.prefMinAge}|${p.prefMaxAge}|'
+        '${p.prefMaxDistanceKm}';
+  }
+
+  /// Fallback kalau RPC `nearby_profiles` gagal: terapkan filter di client.
+  bool _passesMyPreferences(ProfileModel candidate, ProfileModel? me) {
+    if (me == null) return true;
+
+    if (me.prefGender != null && candidate.gender != me.prefGender) {
+      return false;
+    }
+
+    final age = candidate.age;
+    if (age != null && (age < me.prefMinAge || age > me.prefMaxAge)) {
+      return false;
+    }
+
+    if (me.hasLocation && candidate.hasLocation) {
+      final km =
+          Geolocator.distanceBetween(
+            me.latitude!,
+            me.longitude!,
+            candidate.latitude!,
+            candidate.longitude!,
+          ) /
+          1000;
+      if (km > me.prefMaxDistanceKm) return false;
+    }
+
+    return true;
   }
 
   Future<void> fetchDailyBrew({bool showLoader = true}) async {
@@ -68,24 +176,56 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final excludedIds = {...swipedIds, ...hiddenIds}.toList();
 
-      var query = _supabaseClient.from('profiles').select().neq('id', myId);
+      // Kandidat diambil lewat RPC `nearby_profiles` yang menerapkan filter
+      // preferensi (gender, usia, jarak). Limit besar karena profil yang
+      // sudah di-swipe / diblok dibuang di sini, bukan di server.
+      List<ProfileModel> candidates;
 
-      if (excludedIds.isNotEmpty) {
-        query = query.not('id', 'in', excludedIds);
+      try {
+        final nearby = await const ProfileService().getNearbyProfiles(
+          limit: 200,
+        );
+
+        final excluded = excludedIds.toSet();
+
+        candidates = nearby
+            .where((p) => p.id != myId && !excluded.contains(p.id))
+            .toList();
+      } catch (e) {
+        // RPC belum ada / error: pakai query tabel + filter di client.
+        debugPrint('nearby_profiles gagal, pakai fallback: $e');
+
+        var query = _supabaseClient.from('profiles').select().neq('id', myId);
+
+        if (excludedIds.isNotEmpty) {
+          query = query.not('id', 'in', excludedIds);
+        }
+
+        final result = await query.limit(100);
+        final me = ProfileController.to.me;
+
+        candidates = (result as List)
+            .map((item) => ProfileModel.fromMap(item))
+            .where((p) => _passesMyPreferences(p, me))
+            .toList();
       }
 
-      // Ambil kandidat lebih banyak terlebih dahulu
-      // agar Daily Brew dapat dibuat secara acak.
-      final result = await query.limit(50);
-
-      final candidates =
-          (result as List).map((item) => ProfileModel.fromMap(item)).toList()
-            ..shuffle();
+      // Diacak agar Daily Brew bervariasi.
+      candidates.shuffle();
 
       if (!mounted) return;
 
+      final brew = candidates.take(dailyLimit).toList();
+
+      // Suggested diambil dari sisa kandidat, jadi tidak sama dengan Brew.
+      final rest = candidates.skip(dailyLimit).take(suggestedLimit).toList();
+
       setState(() {
-        dailyBrew = candidates.take(dailyLimit).toList();
+        dailyBrew = brew;
+
+        // Hanya kalau kandidat tidak cukup, pakai ulang profil Brew
+        // supaya tab Suggested tidak kosong.
+        suggested = rest.isNotEmpty ? rest : List.of(brew);
 
         isLoading = false;
       });
@@ -140,7 +280,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // Swipe berhasil disimpan.
       // Profil baru dihapus setelah exit animation selesai.
       setState(() {
-        dailyBrew.removeWhere((item) => item.id == profile.id);
+        _removeFromAll(profile);
       });
 
       if (result.isMatch) {
@@ -158,9 +298,9 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
 
-      // Jika Daily Brew sudah habis,
+      // Jika daftar di tab yang sedang dibuka sudah habis,
       // refresh kembali data yang tersedia.
-      if (mounted && dailyBrew.isEmpty) {
+      if (mounted && _activeList.isEmpty) {
         await fetchDailyBrew(showLoader: false);
       }
 
@@ -265,11 +405,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                     child: isLoading
                         ? const _LoadingState(key: ValueKey('loading'))
-                        : dailyBrew.isEmpty
+                        : _activeList.isEmpty
                         ? _EmptyState(
                             key: const ValueKey('empty'),
                             onRefresh: () => fetchDailyBrew(showLoader: true),
                           )
+                        : widget.mode == HomeViewMode.single
+                        ? _buildSingleView()
                         : _DailyBrewContent(
                             key: const ValueKey('content'),
                             profiles: dailyBrew,
@@ -282,9 +424,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               }
 
                               setState(() {
-                                dailyBrew.removeWhere(
-                                  (item) => item.id == profile.id,
-                                );
+                                _removeFromAll(profile);
                               });
                             },
                           ),
@@ -800,7 +940,7 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 9),
           const Text(
-            'Kamu sudah melihat semua pilihan hari ini. Coba kembali lagi besok untuk Daily Brew baru.',
+            'Belum ada profil baru yang cocok dengan filter preferensimu. Coba longgarkan filter usia atau jarak di tab Profile, atau kembali lagi nanti.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppColors.textSecondary,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:bumble/services/block_service.dart';
-import 'package:bumble/services/match_chat_service.dart';
+import 'package:Meetcha/services/block_service.dart';
+import 'package:Meetcha/services/match_chat_service.dart';
 
 Future<bool?> showBlockConfirmDialog({
   required BuildContext context,

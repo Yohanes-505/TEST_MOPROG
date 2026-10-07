@@ -9,7 +9,11 @@ import '../services/subscription_service.dart';
 import 'subscription_screen.dart';
 
 class LikesScreen extends StatefulWidget {
-  const LikesScreen({super.key});
+  /// `true` kalau dibuka lewat push (ada tombol back).
+  /// `false` kalau dipakai sebagai tab di MainShell.
+  final bool showBack;
+
+  const LikesScreen({super.key, this.showBack = true});
 
   @override
   State<LikesScreen> createState() => _LikesScreenState();
@@ -82,7 +86,10 @@ class _LikesScreenState extends State<LikesScreen> {
         elevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: AppColors.ink,
-        leading: IconButton(onPressed: () => Get.back(), icon: const Icon(Icons.arrow_back)),
+        automaticallyImplyLeading: false,
+        leading: widget.showBack
+            ? IconButton(onPressed: () => Get.back(), icon: const Icon(Icons.arrow_back))
+            : null,
         title: const Text('Menyukaimu', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.ink)),
       ),
       body: _isLoading
