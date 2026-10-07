@@ -8,6 +8,7 @@ import 'package:bumble/utils/date_label.dart';
 import 'package:bumble/utils/match_expiry.dart';
 import 'package:bumble/utils/network_error.dart';
 import 'package:bumble/widgets/block_confirm_dialog.dart';
+import 'package:bumble/widgets/emoji_picker.dart';
 import 'package:bumble/widgets/report_bottom_sheet.dart';
 import 'package:bumble/widgets/user_avatar.dart';
 import 'package:flutter/material.dart';
@@ -36,10 +37,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Timer? _expiryTicker;
 
   bool _isLoading = true;
-  bool _isSending = false;
+  bool _queueRunning = false;
+  bool _inForeground = true;
+  bool _markingRead = false;
+  bool _markAgain = false;
   bool _syncing = false;
   bool _realtimeDown = false;
   bool _disposed = false;
+  bool _showEmoji = false;
   bool _historyLoaded = false;
   bool _expiryHandled = false;
   int _channelGen = 0;
@@ -51,10 +56,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _inputFocus.addListener(_onInputFocusChanged);
     _start();
 
     _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (_realtimeDown) _syncSilently();
+      if (_hasOfflineMessages) _processQueue();
     });
 
     _expiryTicker = Timer.periodic(const Duration(seconds: 30), (_) async {
@@ -70,8 +77,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _syncSilently().then((_) => _exitIfExpired());
+    _inForeground = state == AppLifecycleState.resumed;
+    if (_inForeground) {
+      _syncSilently().then((_) {
+        _exitIfExpired();
+        _markIncomingAsRead();
+        _processQueue();
+      });
     }
   }
 
@@ -84,6 +96,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _closeChannel();
     _messageController.dispose();
     _scrollController.dispose();
+    _inputFocus.removeListener(_onInputFocusChanged);
     _inputFocus.dispose();
     super.dispose();
   }
@@ -111,6 +124,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _channel = _service.subscribeToRoom(
         room: room,
         onMessage: _onIncomingMessage,
+        onMessageUpdated: _onMessageUpdated,
         onStatus: (status, error) => _onRealtimeStatus(gen, status, error),
       );
 
@@ -140,7 +154,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
     final ok = status == RealtimeSubscribeStatus.subscribed;
     if (_realtimeDown == ok) setState(() => _realtimeDown = !ok);
-    if (ok) _syncSilently();
+    if (ok) _syncSilently().then((_) => _processQueue());
   }
 
   Future<void> _syncSilently() async {
@@ -174,6 +188,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _loadError = null;
       _historyLoaded = true;
     });
+    _markIncomingAsRead();
   }
 
   void _exitIfExpired() {
@@ -198,59 +213,233 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void _onIncomingMessage(ChatMessage message) {
     if (!mounted || _disposed) return;
     if (_messages.any((m) => m.id == message.id)) return;
+    if (message.senderId == _myId) {
+      final i = _messages.indexWhere(
+        (m) => m.status == MessageStatus.sending && m.text == message.text,
+      );
+      if (i != -1) {
+        setState(() => _messages[i] = message);
+        return;
+      }
+    }
+
     setState(() => _messages.insert(0, message));
+    _markIncomingAsRead();
   }
 
-  Future<void> _sendMessage() async {
+  void _onMessageUpdated(ChatMessage message) {
+    if (!mounted || _disposed) return;
+    final i = _messages.indexWhere((m) => m.id == message.id);
+    if (i == -1 || _messages[i].isRead) return;
+    if (message.isRead) {
+      setState(
+        () => _messages[i] = _messages[i].copyWith(status: MessageStatus.read),
+      );
+    }
+  }
+
+  bool get _hasOfflineMessages =>
+      _messages.any((m) => m.status == MessageStatus.offline);
+
+  Future<void> _markIncomingAsRead() async {
     final room = _room;
+    final myId = _myId;
+    if (room == null || myId == null || !mounted || !_inForeground) return;
+    if (_markingRead) {
+      _markAgain = true;
+      return;
+    }
+
+    final unreadIds = _messages
+        .where((m) => m.senderId != myId && !m.isRead)
+        .map((m) => m.id)
+        .toSet();
+    if (unreadIds.isEmpty) return;
+
+    _markingRead = true;
+    try {
+      await _service.markMessagesRead(room);
+      if (!mounted) return;
+      setState(() {
+        for (var i = 0; i < _messages.length; i++) {
+          if (unreadIds.contains(_messages[i].id)) {
+            _messages[i] =
+                _messages[i].copyWith(status: MessageStatus.read);
+          }
+        }
+      });
+      if (_markAgain) {
+        _markAgain = false;
+        unawaited(_markIncomingAsRead());
+      }
+    } catch (e) {
+      _markAgain = false;
+      debugPrint('Gagal menandai pesan dibaca: $e');
+    } finally {
+      _markingRead = false;
+    }
+  }
+
+  void _sendMessage() {
+    final room = _room;
+    final myId = _myId;
     final text = _messageController.text.trim();
-    if (room == null || text.isEmpty || _isSending || _myId == null) return;
+    if (room == null || text.isEmpty || myId == null) return;
     if (_isExpired) {
       _exitIfExpired();
       return;
     }
 
-    setState(() => _isSending = true);
     _messageController.clear();
+    final local = ChatMessage.local(
+      matchId: room.primaryMatchId,
+      senderId: myId,
+      text: text,
+    );
+    setState(() => _messages.insert(0, local));
+    _scrollToBottom();
+    if (!_showEmoji) _inputFocus.requestFocus();
+    _processQueue();
+  }
 
+  ChatMessage? _nextQueued() {
+    for (var i = _messages.length - 1; i >= 0; i--) {
+      final m = _messages[i];
+      final queued = m.status == MessageStatus.sending ||
+          m.status == MessageStatus.offline;
+      if (queued && m.id.startsWith(ChatMessage.localPrefix)) return m;
+    }
+    return null;
+  }
+
+  Future<void> _processQueue() async {
+    if (_queueRunning) return;
+    _queueRunning = true;
     try {
-      final sent = await _service.sendMessage(room: room, text: text);
-      if (!mounted) return;
+      while (mounted && !_disposed) {
+        final room = _room;
+        final next = room == null ? null : _nextQueued();
+        if (room == null || next == null) break;
 
-      setState(() {
-        if (!_messages.any((m) => m.id == sent.id)) _messages.insert(0, sent);
-      });
-      _scrollToBottom();
-    } catch (e) {
-      debugPrint('Gagal mengirim pesan: $e');
-      if (!mounted) return;
+        _setStatus(next.id, MessageStatus.sending);
+        try {
+          final sent = await _service.sendMessage(room: room, text: next.text);
+          if (!mounted) return;
+          _resolveLocal(next.id, sent);
+        } catch (e) {
+          debugPrint('Gagal mengirim pesan: $e');
+          if (!mounted) return;
 
-      if (_messageController.text.isEmpty) {
-        _messageController.text = text;
-        _messageController.selection =
-            TextSelection.collapsed(offset: text.length);
-      }
+          if (e is TimeoutException) {
+            _setStatus(next.id, MessageStatus.failed);
+            _markQueuedOffline();
+            _syncSilently();
+            Get.snackbar(
+              'Koneksi lambat',
+              'Pesan belum terkonfirmasi. Cek riwayat chat sebelum '
+                  'mengirim ulang.',
+              snackPosition: SnackPosition.BOTTOM,
+            );
+            break;
+          }
 
-      if (e is TimeoutException) {
-        _syncSilently();
-        Get.snackbar(
-          'Koneksi lambat',
-          'Pesan belum terkonfirmasi. Cek riwayat chat sebelum mengirim ulang.',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-      } else {
-        Get.snackbar(
-          'Gagal mengirim',
-          friendlyError(e),
-          snackPosition: SnackPosition.BOTTOM,
-        );
+          if (isNetworkError(e)) {
+            _setStatus(next.id, MessageStatus.offline);
+            _markQueuedOffline();
+            break;
+          }
+
+          _setStatus(next.id, MessageStatus.failed);
+          Get.snackbar(
+            'Gagal mengirim',
+            friendlyError(e),
+            snackPosition: SnackPosition.BOTTOM,
+          );
+        }
       }
     } finally {
-      if (mounted) {
-        setState(() => _isSending = false);
-        _inputFocus.requestFocus();
-      }
+      _queueRunning = false;
     }
+  }
+
+  void _setStatus(String id, MessageStatus status) {
+    if (!mounted) return;
+    final i = _messages.indexWhere((m) => m.id == id);
+    if (i == -1 || _messages[i].status == status) return;
+    setState(() => _messages[i] = _messages[i].copyWith(status: status));
+  }
+
+  void _markQueuedOffline() {
+    if (!mounted) return;
+    setState(() {
+      for (var i = 0; i < _messages.length; i++) {
+        final m = _messages[i];
+        if (m.status == MessageStatus.sending &&
+            m.id.startsWith(ChatMessage.localPrefix)) {
+          _messages[i] = m.copyWith(status: MessageStatus.offline);
+        }
+      }
+    });
+  }
+
+  void _resolveLocal(String localId, ChatMessage sent) {
+    final alreadyThere = _messages.any((m) => m.id == sent.id);
+    final i = _messages.indexWhere((m) => m.id == localId);
+    setState(() {
+      if (i != -1) {
+        if (alreadyThere) {
+          _messages.removeAt(i);
+        } else {
+          _messages[i] = sent;
+        }
+      } else if (!alreadyThere) {
+        _messages.insert(0, sent);
+      }
+      _messages.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    });
+  }
+
+  void _retry(ChatMessage message) {
+    _setStatus(message.id, MessageStatus.sending);
+    _processQueue();
+  }
+
+  void _discard(ChatMessage message) {
+    if (!mounted) return;
+    setState(() => _messages.removeWhere((m) => m.id == message.id));
+  }
+
+  void _showPendingActions(ChatMessage message) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.refresh),
+              title: const Text('Kirim ulang'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _retry(message);
+              },
+            ),
+            ListTile(
+              leading:
+                  const Icon(Icons.delete_outline, color: AppColors.error),
+              title: const Text(
+                'Hapus pesan',
+                style: TextStyle(color: AppColors.error),
+              ),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _discard(message);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _scrollToBottom() {
@@ -259,6 +448,59 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       0,
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeOut,
+    );
+  }
+
+  // BAGIAN EMOJIII
+  void _onInputFocusChanged() {
+    if (_inputFocus.hasFocus && _showEmoji) {
+      setState(() => _showEmoji = false);
+    }
+  }
+
+  void _toggleEmoji() {
+    if (_showEmoji) {
+      setState(() => _showEmoji = false);
+      _inputFocus.requestFocus();
+    } else {
+      _inputFocus.unfocus();
+      setState(() => _showEmoji = true);
+    }
+  }
+
+  void _insertEmoji(String emoji) {
+    final value = _messageController.value;
+    final text = value.text;
+    final sel = value.selection;
+    final start = sel.isValid ? sel.start.clamp(0, text.length) : text.length;
+    final end = sel.isValid ? sel.end.clamp(0, text.length) : text.length;
+
+    _messageController.value = TextEditingValue(
+      text: text.replaceRange(start, end, emoji),
+      selection: TextSelection.collapsed(offset: start + emoji.length),
+    );
+  }
+
+  void _deleteBeforeCursor() {
+    final value = _messageController.value;
+    final text = value.text;
+    final sel = value.selection;
+    final start = sel.isValid ? sel.start.clamp(0, text.length) : text.length;
+    final end = sel.isValid ? sel.end.clamp(0, text.length) : text.length;
+
+    if (start != end) {
+      _messageController.value = TextEditingValue(
+        text: text.replaceRange(start, end, ''),
+        selection: TextSelection.collapsed(offset: start),
+      );
+      return;
+    }
+    if (start == 0) return;
+
+    final before = text.substring(0, start).characters.skipLast(1).toString();
+    _messageController.value = TextEditingValue(
+      text: before + text.substring(start),
+      selection: TextSelection.collapsed(offset: before.length),
     );
   }
 
@@ -286,49 +528,60 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.ink,
-        elevation: 0,
-        actions: [
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'report') _reportUser();
-              if (value == 'block') _blockUser();
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem(
-                value: 'report',
-                child: Row(
-                  children: [
-                    Icon(Icons.flag_outlined, color: AppColors.error, size: 20),
-                    SizedBox(width: 8),
-                    Text('Laporkan'),
-                  ],
+    return PopScope(
+      canPop: !_showEmoji,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _showEmoji) setState(() => _showEmoji = false);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          foregroundColor: AppColors.ink,
+          elevation: 0,
+          actions: [
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'report') _reportUser();
+                if (value == 'block') _blockUser();
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'report',
+                  child: Row(
+                    children: [
+                      Icon(Icons.flag_outlined, color: AppColors.error, size: 20),
+                      SizedBox(width: 8),
+                      Text('Laporkan'),
+                    ],
+                  ),
                 ),
-              ),
-              PopupMenuItem(
-                value: 'block',
-                child: Row(
-                  children: [
-                    Icon(Icons.block, color: AppColors.error, size: 20),
-                    SizedBox(width: 8),
-                    Text('Blokir'),
-                  ],
+                PopupMenuItem(
+                  value: 'block',
+                  child: Row(
+                    children: [
+                      Icon(Icons.block, color: AppColors.error, size: 20),
+                      SizedBox(width: 8),
+                      Text('Blokir'),
+                    ],
+                  ),
                 ),
+              ],
+            ),
+          ],
+        ),
+        body: Column(
+          children: [
+            _buildProfileHeader(),
+            _buildConnectionBanner(),
+            Expanded(child: _buildMessages()),
+            _buildInputBar(),
+            if (_showEmoji)
+              EmojiPickerPanel(
+                onEmojiSelected: _insertEmoji,
+                onBackspace: _deleteBeforeCursor,
               ),
-            ],
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          _buildProfileHeader(),
-          _buildConnectionBanner(),
-          Expanded(child: _buildMessages()),
-          _buildInputBar(),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -337,7 +590,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (!_historyLoaded) return null;
     return matchTimeLeft(
       matchedAt: _room?.matchedAt,
-      hasMessages: _messages.isNotEmpty,
+      hasMessages: _messages.any((m) => !m.isPending),
     );
   }
 
@@ -450,6 +703,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
 
     final myId = _myId;
+    String? latestMineId;
+    for (final m in _messages) {
+      if (m.senderId == myId) {
+        latestMineId = m.id;
+        break;
+      }
+    }
 
     return ListView.builder(
       controller: _scrollController,
@@ -461,11 +721,21 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         final older = index + 1 < _messages.length ? _messages[index + 1] : null;
         final showDate =
             older == null || !isSameDay(message.createdAt, older.createdAt);
+        final isMe = message.senderId == myId;
 
         return Column(
           children: [
             if (showDate) _DateChip(label: formatDayLabel(message.createdAt)),
-            _MessageBubble(message: message, isMe: message.senderId == myId),
+            _MessageBubble(
+              message: message,
+              isMe: isMe,
+              showStatusLabel: isMe && message.id == latestMineId,
+              onTapPending: isMe &&
+                      (message.status == MessageStatus.offline ||
+                          message.status == MessageStatus.failed)
+                  ? () => _showPendingActions(message)
+                  : null,
+            ),
           ],
         );
       },
@@ -487,6 +757,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       ),
       child: SafeArea(
         top: false,
+        bottom: !_showEmoji,
         child: Row(
           children: [
             Expanded(
@@ -499,8 +770,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 onSubmitted: (_) => _sendMessage(),
                 decoration: InputDecoration(
                   hintText: 'Ketik pesan...',
+                  prefixIcon: IconButton(
+                    tooltip: _showEmoji ? 'Tampilkan keyboard' : 'Pilih emoji',
+                    icon: Icon(
+                      _showEmoji
+                          ? Icons.keyboard_alt_outlined
+                          : Icons.emoji_emotions_outlined,
+                      color: AppColors.textSecondary,
+                    ),
+                    onPressed: _room == null ? null : _toggleEmoji,
+                  ),
+                  prefixIconConstraints:
+                      const BoxConstraints(minWidth: 44, minHeight: 40),
                   contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      const EdgeInsets.fromLTRB(0, 10, 16, 10),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(24),
                     borderSide: BorderSide.none,
@@ -514,17 +797,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             CircleAvatar(
               backgroundColor: AppColors.primary,
               child: IconButton(
-                icon: _isSending
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.onPrimary,
-                        ),
-                      )
-                    : const Icon(Icons.send, color: AppColors.onPrimary, size: 20),
-                onPressed: (_isSending || _room == null) ? null : _sendMessage,
+                icon: const Icon(
+                  Icons.send,
+                  color: AppColors.onPrimary,
+                  size: 20,
+                ),
+                onPressed: _room == null ? null : _sendMessage,
               ),
             ),
           ],
@@ -538,50 +816,168 @@ class _MessageBubble extends StatelessWidget {
   final ChatMessage message;
   final bool isMe;
 
-  const _MessageBubble({required this.message, required this.isMe});
+  final bool showStatusLabel;
+  final VoidCallback? onTapPending;
+
+  const _MessageBubble({
+    required this.message,
+    required this.isMe,
+    this.showStatusLabel = false,
+    this.onTapPending,
+  });
 
   @override
   Widget build(BuildContext context) {
     final maxWidth = MediaQuery.of(context).size.width * 0.75;
+    final status = message.status;
+    final needsAttention =
+        status == MessageStatus.offline || status == MessageStatus.failed;
+    final dimmed = isMe && (status == MessageStatus.sending || needsAttention);
+
+    final bubble = Container(
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: isMe
+            ? AppColors.primary.withValues(alpha: dimmed ? 0.65 : 1)
+            : AppColors.surfaceMuted,
+        border: isMe && status == MessageStatus.failed
+            ? Border.all(color: AppColors.error, width: 1.5)
+            : null,
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(16),
+          topRight: const Radius.circular(16),
+          bottomLeft: Radius.circular(isMe ? 16 : 4),
+          bottomRight: Radius.circular(isMe ? 4 : 16),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment:
+            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          Text(
+            message.text,
+            style: TextStyle(
+              color: isMe ? AppColors.onPrimary : AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                formatClock(message.createdAt),
+                style: TextStyle(
+                  fontSize: 10,
+                  color: (isMe ? AppColors.onPrimary : AppColors.textSecondary)
+                      .withValues(alpha: 0.7),
+                ),
+              ),
+              if (isMe) ...[
+                const SizedBox(width: 4),
+                _StatusIcon(status: status),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: isMe ? AppColors.primary : AppColors.surfaceMuted,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(isMe ? 16 : 4),
-            bottomRight: Radius.circular(isMe ? 4 : 16),
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment:
-              isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Text(
-              message.text,
-              style: TextStyle(
-                color: isMe ? AppColors.onPrimary : AppColors.textPrimary,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment:
+            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          GestureDetector(onTap: onTapPending, child: bubble),
+          if (isMe && (showStatusLabel || needsAttention))
+            Padding(
+              padding: const EdgeInsets.only(top: 3, right: 2),
+              child: GestureDetector(
+                onTap: onTapPending,
+                child: Text(
+                  _statusLabel(status),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight:
+                        needsAttention ? FontWeight.w600 : FontWeight.w400,
+                    color: _statusLabelColor(status),
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 2),
-            Text(
-              formatClock(message.createdAt),
-              style: TextStyle(
-                fontSize: 10,
-                color: (isMe ? AppColors.onPrimary : AppColors.textSecondary)
-                    .withValues(alpha: 0.7),
-              ),
-            ),
-          ],
-        ),
+          const SizedBox(height: 8),
+        ],
       ),
+    );
+  }
+}
+
+const Color _readedColor = Color(0xFF7FDBFF);
+
+String _statusLabel(MessageStatus status) {
+  switch (status) {
+    case MessageStatus.sending:
+      return 'Mengirim…';
+    case MessageStatus.offline:
+      return 'Di luar jaringan · akan dikirim otomatis';
+    case MessageStatus.failed:
+      return 'Gagal terkirim · ketuk untuk opsi';
+    case MessageStatus.sent:
+      return 'Terkirim';
+    case MessageStatus.read:
+      return 'Dibaca';
+  }
+}
+
+Color _statusLabelColor(MessageStatus status) {
+  switch (status) {
+    case MessageStatus.sending:
+    case MessageStatus.sent:
+      return AppColors.textSecondary;
+    case MessageStatus.offline:
+      return AppColors.warning;
+    case MessageStatus.failed:
+      return AppColors.error;
+    case MessageStatus.read:
+      return AppColors.matchaDeep;
+  }
+}
+
+class _StatusIcon extends StatelessWidget {
+  final MessageStatus status;
+
+  const _StatusIcon({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final faded = AppColors.onPrimary.withValues(alpha: 0.75);
+
+    final IconData icon;
+    final Color color;
+    switch (status) {
+      case MessageStatus.sending:
+        icon = Icons.schedule;
+        color = faded;
+      case MessageStatus.offline:
+        icon = Icons.done;
+        color = faded;
+      case MessageStatus.failed:
+        icon = Icons.error_outline;
+        color = AppColors.errorSoft;
+      case MessageStatus.sent:
+        icon = Icons.done_all;
+        color = faded;
+      case MessageStatus.read:
+        icon = Icons.done_all;
+        color = _readedColor;
+    }
+
+    return Semantics(
+      label: _statusLabel(status),
+      child: Icon(icon, size: 14, color: color),
     );
   }
 }
