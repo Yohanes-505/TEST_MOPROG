@@ -7,15 +7,18 @@ import 'package:bumble/widgets/interest_selector.dart';
 import 'package:bumble/widgets/photo_grid_picker.dart';
 import 'package:bumble/services/profile_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show Supabase;
 
 /// Node flowchart: "Profile Setup — Gender, Bio, Interest/Hobby Tags,
 /// Preferensi & Lokasi GPS".
 ///
-/// Dibagi jadi 3 langkah supaya tidak satu form panjang:
-///   1. Tentang kamu  : foto, umur, gender, bio
-///   2. Minat         : interest/hobby tags
-///   3. Lokasi        : izin GPS + filter preferensi awal
+/// Dibagi jadi 4 langkah supaya tidak satu form panjang:
+///   1. Foto          : upload foto (opsional, tanpa validasi)
+///   2. Tentang kamu  : nama, umur, gender, bio (wajib)
+///   3. Minat         : interest/hobby tags
+///   4. Lokasi        : izin GPS + filter preferensi awal
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
 
@@ -32,6 +35,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final TextEditingController bioController = TextEditingController();
 
   int _step = 0;
+  bool _photoBusy = false;
+  bool _isFinishing = false;
+  final _scrollController = ScrollController();
+  final _nameKey = GlobalKey();
+  final _ageKey = GlobalKey();
+  final _genderKey = GlobalKey();
+  String? _nameError;
+  String? _ageError;
+  String? _genderError;
   Gender? _gender;
   List<String> _interests = [];
 
@@ -40,18 +52,49 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   RangeValues _ageRange = const RangeValues(18, 35);
   double _maxDistance = 50;
 
-  static const int _totalSteps = 3;
+  static const int _totalSteps = 4;
 
   @override
   void initState() {
     super.initState();
-    // Nama mungkin sudah terisi dari signup; kalau belum, user isi di sini.
-    nameController.text = controller.me?.name ?? '';
+    _prefillFromAccount();
+  }
+
+  /// ProfileController dibuat di main() sebelum user login, jadi `me` bisa
+  /// kosong / basi saat layar ini dibuka (terutama habis sign up). Muat ulang
+  /// profil user yang sedang login, lalu isi nama dari profil atau metadata
+  /// akun sebagai cadangan.
+  Future<void> _prefillFromAccount() async {
+    final authUser = Supabase.instance.client.auth.currentUser;
+    final metaName = (authUser?.userMetadata?['name'] as String?)?.trim() ?? '';
+    if (metaName.isNotEmpty && nameController.text.isEmpty) {
+      nameController.text = metaName;
+    }
+
+    await controller.loadProfile();
+    if (!mounted) return;
+
+    final me = controller.me;
+    // Jangan menimpa kalau user sudah mulai mengetik.
+    if (nameController.text.trim().isEmpty && (me?.name ?? '').isNotEmpty) {
+      nameController.text = me!.name;
+    }
+    if (ageController.text.isEmpty && me?.age != null) {
+      ageController.text = me!.age.toString();
+    }
+    if (bioController.text.isEmpty && (me?.bio ?? '').isNotEmpty) {
+      bioController.text = me!.bio!;
+    }
+    setState(() {
+      _gender ??= me?.gender;
+      if (_interests.isEmpty && me != null) _interests = List.of(me.interests);
+    });
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _scrollController.dispose();
     nameController.dispose();
     ageController.dispose();
     bioController.dispose();
@@ -63,13 +106,55 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   // ----------------------------------------------------------------
 
   String? _validateStepOne() {
-    if (nameController.text.trim().isEmpty) return 'Isi nama kamu dulu.';
-    final age = int.tryParse(ageController.text.trim());
-    if (age == null) return 'Masukkan umur yang valid.';
-    if (age < 18) return 'Kamu harus berusia minimal 18 tahun.';
-    if (age > 100) return 'Umur tidak valid.';
-    if (_gender == null) return 'Pilih gender kamu.';
-    return null;
+    String? nameErr, ageErr, genderErr;
+
+    if (nameController.text.trim().isEmpty) nameErr = 'Isi nama kamu dulu.';
+
+    final ageText = ageController.text.trim();
+    final age = int.tryParse(ageText);
+    if (ageText.isEmpty) {
+      ageErr = 'Isi umur kamu dulu.';
+    } else if (age == null) {
+      ageErr = 'Umur harus berupa angka.';
+    } else if (age < 18) {
+      ageErr = 'Kamu harus berusia minimal 18 tahun.';
+    } else if (age > 100) {
+      ageErr = 'Umur tidak valid.';
+    }
+
+    if (_gender == null) genderErr = 'Pilih gender kamu.';
+
+    if (mounted) {
+      setState(() {
+        _nameError = nameErr;
+        _ageError = ageErr;
+        _genderError = genderErr;
+      });
+    }
+
+    final firstError = nameErr ?? ageErr ?? genderErr;
+    if (firstError != null) {
+      final key = nameErr != null
+          ? _nameKey
+          : ageErr != null
+              ? _ageKey
+              : _genderKey;
+      _scrollToField(key);
+    }
+    return firstError;
+  }
+
+  void _scrollToField(GlobalKey key) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = key.currentContext;
+      if (ctx == null) return;
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+        alignment: 0.1,
+      );
+    });
   }
 
   String? _validateStepTwo() {
@@ -89,10 +174,23 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Future<void> _onNext() async {
-    final error = _step == 0 ? _validateStepOne() : _validateStepTwo();
-    if (_step < 2 && error != null) {
-      Get.snackbar('Belum lengkap', error,
+    FocusScope.of(context).unfocus();
+
+    if (_photoBusy) {
+      Get.snackbar('Tunggu sebentar', 'Foto kamu masih diproses.',
           snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+
+    // Langkah 0 (foto) dibuat opsional sehingga bisa lanjut ke setup berikutnya.
+    final error = switch (_step) {
+      1 => _validateStepOne(),
+      2 => _validateStepTwo(),
+      _ => null,
+    };
+    if (error != null) {
+      Get.snackbar('Belum lengkap', error,
+          snackPosition: SnackPosition.TOP);
       return;
     }
 
@@ -105,6 +203,22 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Future<void> _finish() async {
+    if (_isFinishing) return;
+
+    // Ini buat validasi ulang, biar ga ada yang terlewat
+    final errorOne = _validateStepOne();
+    if (errorOne != null) {
+      _goTo(1); // Ini buat selesain masalah ketika klik "lanjut" terdapat data yang belum lengkap sehingga direct ke profile setup no 1
+      Get.snackbar('Belum lengkap', errorOne, snackPosition: SnackPosition.TOP);
+      return;
+    }
+    final errorTwo = _validateStepTwo();
+    if (errorTwo != null) {
+      _goTo(2);
+      Get.snackbar('Belum lengkap', errorTwo, snackPosition: SnackPosition.TOP);
+      return;
+    }
+
     final profile = controller.me;
     if (profile == null || !profile.hasLocation) {
       Get.snackbar(
@@ -115,25 +229,31 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       return;
     }
 
-    final saved = await controller.saveProfile(
-      name: nameController.text.trim(),
-      age: int.parse(ageController.text.trim()),
-      bio: bioController.text.trim(),
-      gender: _gender,
-      interests: _interests,
-    );
-    if (!saved) return;
+    _isFinishing = true;
+    try {
+      final saved = await controller.saveProfile(
+        name: nameController.text.trim(),
+        age: int.parse(ageController.text.trim()),
+        bio: bioController.text.trim(),
+        gender: _gender,
+        interests: _interests,
+      );
+      if (!saved) return;
 
-    await controller.savePreferences(
-      prefGender: _prefGender,
-      minAge: _ageRange.start.round(),
-      maxAge: _ageRange.end.round(),
-      maxDistanceKm: _maxDistance.round(),
-    );
+      final prefsSaved = await controller.savePreferences(
+        prefGender: _prefGender,
+        minAge: _ageRange.start.round(),
+        maxAge: _ageRange.end.round(),
+        maxDistanceKm: _maxDistance.round(),
+      );
+      if (!prefsSaved) return;
 
-    await controller.loadProfile();
+      await controller.loadProfile();
 
-    Get.offAll(() => const MainShell());
+      Get.offAll(() => const MainShell());
+    } finally {
+      _isFinishing = false;
+    }
   }
 
   // ----------------------------------------------------------------
@@ -156,6 +276,7 @@ Widget build(BuildContext context) {
                   controller: _pageController,
                   physics: const NeverScrollableScrollPhysics(),
                   children: [
+                    _stepPhotos(),
                     _stepAboutYou(),
                     _stepInterests(),
                     _stepLocation(),
@@ -172,13 +293,16 @@ Widget build(BuildContext context) {
 }
 
   Widget _header() {
+  final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
   const titles = [
+    'Foto Kamu',
     'Tentang Kamu',
     'Minat Kamu',
     'Lokasi & Preferensi',
   ];
 
   const subtitles = [
+    'Tambahkan foto supaya profilmu lebih menarik.',
     'Bantu kami mengenalmu sedikit lebih dekat.',
     'Pilih hal-hal yang membuat kamu jadi dirimu.',
     'Atur siapa yang ingin kamu temui di sekitar kamu.',
@@ -237,6 +361,7 @@ Widget build(BuildContext context) {
           }),
         ),
 
+        if (!keyboardOpen) ...[
         const SizedBox(height: 24),
 
         Text(
@@ -261,50 +386,90 @@ Widget build(BuildContext context) {
             fontWeight: FontWeight.w500,
           ),
         ),
+        ],
       ],
     ),
   );
 }
-  Widget _stepAboutYou() {
+
+  Widget _stepPhotos() {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Obx(() => PhotoGridPicker(
-                userId: controller.me?.id ?? '',
-                initialPhotos: controller.me?.photoUrls ?? [],
+                key: ValueKey(controller.me?.id ?? 'no-profile'),
+                userId: const ProfileService().currentUserId ?? '',
+                initialPhotos: controller.me?.photoUrls ?? const [],
                 profileService: const ProfileService(),
+                onBusyChanged: (busy) {
+                  if (mounted) setState(() => _photoBusy = busy);
+                },
               )),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           const Center(
             child: Text(
-              'Foto profil (opsional, tapi sangat disarankan)',
+              'Foto profil (opsional, tapi sangat disarankan).\nFoto pertama jadi foto utama.',
+              textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
           ),
-          const SizedBox(height: 28),
-          _label('Nama'),
+        ],
+      ),
+    );
+  }
+
+  Widget _stepAboutYou() {
+    return SingleChildScrollView(
+      controller: _scrollController,
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Data diri (wajib diisi)',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 14),
+          _label('Nama', key: _nameKey),
           TextField(
             controller: nameController,
             textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            onChanged: (_) {
+              if (_nameError != null) setState(() => _nameError = null);
+            },
             decoration: _inputDecoration(
               hint: 'Nama yang tampil di profil kamu',
               icon: Icons.person_outline,
+              errorText: _nameError,
             ),
           ),
           const SizedBox(height: 20),
-          _label('Umur'),
+          _label('Umur', key: _ageKey),
           TextField(
             controller: ageController,
+            onChanged: (_) {
+              if (_ageError != null) setState(() => _ageError = null);
+            },
             keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(3),
+            ],
             decoration: _inputDecoration(
               hint: 'Masukkan umur kamu',
               icon: Icons.cake_outlined,
+              errorText: _ageError,
             ),
           ),
           const SizedBox(height: 20),
-          _label('Gender'),
+          _label('Gender', key: _genderKey),
           Wrap(
             spacing: 10,
             children: Gender.values.map((g) {
@@ -312,7 +477,10 @@ Widget build(BuildContext context) {
               return ChoiceChip(
                 label: Text(g.label),
                 selected: isSelected,
-                onSelected: (_) => setState(() => _gender = g),
+                onSelected: (_) => setState(() {
+                  _gender = g;
+                  _genderError = null;
+                }),
                 selectedColor: AppColors.primary,
                 backgroundColor: Colors.grey.shade100,
                 labelStyle: TextStyle(
@@ -330,6 +498,14 @@ Widget build(BuildContext context) {
               );
             }).toList(),
           ),
+          if (_genderError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, left: 4),
+              child: Text(
+                _genderError!,
+                style: const TextStyle(color: AppColors.error, fontSize: 12),
+              ),
+            ),
           const SizedBox(height: 20),
           _label('Bio'),
           TextField(
@@ -554,7 +730,7 @@ Widget build(BuildContext context) {
           child: SizedBox(
             height: 54,
             child: Obx(() {
-              final busy = controller.isSaving.value;
+              final busy = controller.isSaving.value || _photoBusy;
 
               return ElevatedButton(
                 onPressed: busy ? null : _onNext,
@@ -594,14 +770,20 @@ Widget build(BuildContext context) {
   );
 }
 
-  Widget _label(String text) => Padding(
+  Widget _label(String text, {Key? key}) => Padding(
+        key: key,
         padding: const EdgeInsets.only(bottom: 8),
         child: Text(text, style: const TextStyle(fontWeight: FontWeight.w600)),
       );
 
-  InputDecoration _inputDecoration({required String hint, IconData? icon}) {
+  InputDecoration _inputDecoration({
+    required String hint,
+    IconData? icon,
+    String? errorText,
+  }) {
     return InputDecoration(
       hintText: hint,
+      errorText: errorText,
       prefixIcon: icon == null ? null : Icon(icon),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
     );
