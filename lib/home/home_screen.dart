@@ -26,8 +26,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool isLoading = true;
   final int dailyLimit = 10;
 
-  final int dailyLimit = 5;
-
   final SwipeService _swipeService = const SwipeService();
 
   /// ID profil yang pilihannya sedang diproses.
