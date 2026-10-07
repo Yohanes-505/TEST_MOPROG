@@ -11,6 +11,8 @@ import 'package:Meetcha/widgets/block_confirm_dialog.dart';
 import 'package:Meetcha/widgets/emoji_picker.dart';
 import 'package:Meetcha/widgets/report_bottom_sheet.dart';
 import 'package:Meetcha/widgets/user_avatar.dart';
+import 'package:Meetcha/widgets/verified_badge.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';

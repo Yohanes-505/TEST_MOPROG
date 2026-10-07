@@ -9,6 +9,8 @@ import 'package:Meetcha/services/match_chat_service.dart';
 import 'package:Meetcha/utils/date_label.dart';
 import 'package:Meetcha/utils/network_error.dart';
 import 'package:Meetcha/widgets/user_avatar.dart';
+import 'package:Meetcha/widgets/verified_badge.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
