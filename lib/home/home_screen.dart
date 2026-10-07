@@ -63,14 +63,16 @@ class _HomeScreenState extends State<HomeScreen> {
         query = query.not('id', 'in', excludedIds);
       }
 
-      final result = await query.limit(dailyLimit);
-      // Menggunakan RPC get_swipe_feed untuk menerapkan filter umur/gender/jarak
-      final res = await _supabaseClient.rpc('get_swipe_feed', params: {'p_limit': 10});
-      final List data = res as List;
+      final result = await query.limit(50);
+
+      final candidates = (result as List)
+          .map((e) => ProfileModel.fromMap(e))
+          .toList()
+        ..shuffle();
 
       if (mounted) {
         setState(() {
-          dailyBrew = data.map((e) => ProfileModel.fromMap(e)).toList();
+          dailyBrew = candidates.take(dailyLimit).toList();
           isLoading = false;
         });
       }
@@ -144,7 +146,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          "Matcha",
+          "Meetcha",
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: false,
