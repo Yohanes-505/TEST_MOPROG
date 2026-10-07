@@ -1,37 +1,56 @@
 import 'package:flutter/material.dart';
 
+/// Palet Meetcha. Lima warna inti dari palet desain:
+/// tan 9E7C5F, brown 6F5840, sage 658C5E, sage light 91A287, cream FFF0D6.
+/// Warna lain (ink, soft, border) adalah turunan dari kelimanya
+/// supaya kontras teks tetap terbaca.
 class AppColors {
   AppColors._();
 
-  // Warna inti
-  static const Color lime = Color(0xFF9BF272);
-  static const Color green = Color(0xFF7ABF5A);
-  static const Color ink = Color(0xFF193940);
-  static const Color mist = Color(0xFFBAC8D9);
+  // Warna inti (palet desain)
+  static const Color tan = Color(0xFF9E7C5F);
+  static const Color brown = Color(0xFF6F5840);
+  static const Color sage = Color(0xFF658C5E);
+  static const Color sageLight = Color(0xFF91A287);
+  static const Color cream = Color(0xFFFFF0D6);
+
+  // Alias nama lama supaya file yang belum diperbarui tetap bisa dikompilasi.
+  static const Color lime = sageLight;
+  static const Color green = sage;
+
+  /// Cokelat tua turunan `brown` — latar gelap (welcome) dan teks utama.
+  static const Color espresso = Color(0xFF3B2818);
+  static const Color ink = espresso;
+
+  /// Cokelat muda turunan `tan` — garis pemisah & border netral.
+  static const Color mist = Color(0xFFDCCBB5);
 
   /// Latar tombol utama, chip terpilih, slider aktif.
-  static const Color primary = lime;
+  static const Color primary = sageLight;
 
   /// Teks/ikon DI ATAS `primary`.
   static const Color onPrimary = ink;
 
-  /// Hijau tua turunan — untuk ikon, teks, dan border hijau di atas putih.
-  static const Color primaryDeep = Color(0xFF3F7A2A);
+  /// Sage tua turunan `sage` — untuk ikon, teks, dan border di atas latar terang.
+  static const Color primaryDeep = Color(0xFF517049);
 
-  /// Latar lembut bernuansa hijau (pengganti purple.shade50, dsb).
-  static const Color primarySoft = Color(0xFFEFFBE7);
+  /// Latar lembut bernuansa sage.
+  static const Color primarySoft = Color(0xFFEAF0E5);
 
-  /// Border tipis bernuansa hijau (pengganti purple.shade100).
-  static const Color primaryBorder = Color(0xFFCFEFBC);
+  /// Border tipis bernuansa sage.
+  static const Color primaryBorder = Color(0xFFCBD7C3);
 
-  static const Color background = Colors.white;
-  static const Color surfaceMuted = Color(0xFFF2F5F8);
+  /// Latar halaman: cream yang dilembutkan. `cream` murni dipakai untuk
+  /// permukaan yang perlu menonjol (chip, kartu, area muted).
+  static const Color background = Color(0xFFFFF9EE);
+  static const Color surfaceMuted = cream;
 
   static const Color textPrimary = ink;
-  static const Color textSecondary = Color(0xFF5E7079);
+  static const Color textSecondary = brown;
 
-  /// Garis pemisah & border netral.
+  /// Garis pemisah & border netral (hangat).
   static const Color border = mist;
+  static const Color borderSoft = Color(0xFFF0E4D2);
 
   // Warna semantik
   static const Color success = primaryDeep;
