@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:bumble/models/chat_message.dart';
 import 'package:bumble/models/match_preview.dart';
 import 'package:bumble/models/profile_model.dart';
+import 'package:bumble/services/block_service.dart';
 import 'package:bumble/utils/network_error.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -46,6 +47,9 @@ class MatchChatService {
     if (myId == null) return [];
 
     final refs = _groupByCounterpart(await _fetchMatchRows(myId), myId);
+    final hidden = await BlockService.getHiddenUserIds(myId);
+    refs.removeWhere((id, _) => hidden.contains(id));
+
     final profiles = await _fetchProfiles(refs.keys);
     return profiles.values.toList();
   }
@@ -55,6 +59,8 @@ class MatchChatService {
     if (myId == null) return [];
 
     final refs = _groupByCounterpart(await _fetchMatchRows(myId), myId);
+    final hidden = await BlockService.getHiddenUserIds(myId);
+    refs.removeWhere((id, _) => hidden.contains(id));
     if (refs.isEmpty) return [];
 
     final profiles = await _fetchProfiles(refs.keys);
@@ -189,6 +195,9 @@ class MatchChatService {
       final b = row['user2_id'].toString();
       final otherId = a == myId ? b : a;
       if (otherId == myId) return null;
+
+      final hidden = await BlockService.getHiddenUserIds(myId);
+      if (hidden.contains(otherId)) return null;
 
       final profiles = await _fetchProfiles([otherId]);
       return profiles[otherId];
