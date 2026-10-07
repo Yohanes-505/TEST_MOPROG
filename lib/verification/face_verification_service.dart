@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bumble/controllers/profile_controller.dart';
 
 import 'face_matcher.dart';
 
@@ -147,16 +148,8 @@ class FaceVerificationService {
   }
 
   Future<File?> _downloadProfilePhoto() async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return null;
-
-    final row = await _supabase
-        .from(_profilesTable)
-        .select(_profilePhotoColumn)
-        .eq(_profilesIdColumn, user.id)
-        .maybeSingle();
-    final url = row?[_profilePhotoColumn] as String?;
-    if (url == null || url.isEmpty) return null;
+    final url = ProfileController.to.me?.photoUrl;
+    if (url == null || !url.startsWith('http')) return null;
 
     final client = HttpClient();
     try {
