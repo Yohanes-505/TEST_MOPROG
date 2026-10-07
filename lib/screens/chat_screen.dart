@@ -1,11 +1,11 @@
 import 'dart:async';
-
 import 'package:bumble/constants/app_colors.dart';
 import 'package:bumble/models/chat_message.dart';
 import 'package:bumble/models/profile_model.dart';
 import 'package:bumble/models/report_model.dart';
 import 'package:bumble/services/match_chat_service.dart';
 import 'package:bumble/utils/date_label.dart';
+import 'package:bumble/utils/match_expiry.dart';
 import 'package:bumble/utils/network_error.dart';
 import 'package:bumble/widgets/block_confirm_dialog.dart';
 import 'package:bumble/widgets/report_bottom_sheet.dart';
@@ -24,8 +24,6 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
-  static const Duration _matchLifetime = Duration(hours: 24);
-
   final MatchChatService _service = const MatchChatService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -42,6 +40,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _syncing = false;
   bool _realtimeDown = false;
   bool _disposed = false;
+  bool _historyLoaded = false;
+  bool _expiryHandled = false;
   int _channelGen = 0;
   String? _loadError;
 
@@ -57,15 +57,22 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (_realtimeDown) _syncSilently();
     });
 
-    // Reload countdown buat waktu kadaluarsa
-    _expiryTicker = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted && _room?.matchedAt != null) setState(() {});
+    _expiryTicker = Timer.periodic(const Duration(seconds: 30), (_) async {
+      if (!mounted || _expiryHandled) return;
+      if (_isExpired) {
+        await _syncSilently();
+        _exitIfExpired();
+      } else if (_remaining != null) {
+        setState(() {});
+      }
     });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _syncSilently();
+    if (state == AppLifecycleState.resumed) {
+      _syncSilently().then((_) => _exitIfExpired());
+    }
   }
 
   @override
@@ -110,6 +117,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final history = await _service.getMessages(room);
       if (!mounted) return;
       _applyHistory(history);
+      _exitIfExpired();
     } catch (e) {
       debugPrint('Gagal membuka chat: $e');
       if (!mounted) return;
@@ -164,7 +172,27 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ..addAll(merged);
       _isLoading = false;
       _loadError = null;
+      _historyLoaded = true;
     });
+  }
+
+  void _exitIfExpired() {
+    if (_expiryHandled || !mounted || !_isExpired) return;
+    _expiryHandled = true;
+
+    _expiryTicker?.cancel();
+    _pollTimer?.cancel();
+    _closeChannel();
+    unawaited(_service.purgeExpiredMatches());
+
+    final name = widget.matchProfile.name;
+    Navigator.of(context).pop();
+    Get.snackbar(
+      'Match kadaluarsa',
+      'Match dengan $name dihapus karena belum ada pesan dalam '
+          '${kMatchLifetime.inHours} jam.',
+      snackPosition: SnackPosition.BOTTOM,
+    );
   }
 
   void _onIncomingMessage(ChatMessage message) {
@@ -177,6 +205,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final room = _room;
     final text = _messageController.text.trim();
     if (room == null || text.isEmpty || _isSending || _myId == null) return;
+    if (_isExpired) {
+      _exitIfExpired();
+      return;
+    }
 
     setState(() => _isSending = true);
     _messageController.clear();
@@ -301,13 +333,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
-  // Ini buat nunjukkin berapa lama lagi sebelum matchnya kadaluarsa
   Duration? get _remaining {
-    final at = _room?.matchedAt;
-    if (at == null) return null;
-    final left = at.add(_matchLifetime).difference(DateTime.now());
-    return left.isNegative ? Duration.zero : left;
+    if (!_historyLoaded) return null;
+    return matchTimeLeft(
+      matchedAt: _room?.matchedAt,
+      hasMessages: _messages.isNotEmpty,
+    );
   }
+
+  bool get _isExpired => _remaining == Duration.zero;
 
   Widget _buildProfileHeader() {
     final profile = widget.matchProfile;

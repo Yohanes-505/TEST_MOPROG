@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bumble/constants/app_colors.dart';
 import 'package:bumble/models/match_preview.dart';
 import 'package:bumble/models/profile_model.dart';
@@ -25,15 +27,16 @@ class _MatchChatScreenState extends State<MatchChatScreen> {
   bool _isLoading = true;
   String? _error;
   RealtimeChannel? _inboxChannel;
+  Timer? _expiryTicker;
 
   int _loadSeq = 0;
 
   List<MatchPreview> get _newMatches =>
-      _items.where((m) => !m.hasMessages).toList();
+      _items.where((m) => !m.isExpired && !m.hasMessages).toList();
 
   /// Match yang sudah ada percakapannya.
   List<MatchPreview> get _conversations =>
-      _items.where((m) => m.hasMessages).toList();
+      _items.where((m) => !m.isExpired && m.hasMessages).toList();
 
   @override
   void initState() {
@@ -43,11 +46,17 @@ class _MatchChatScreenState extends State<MatchChatScreen> {
       isMyMatch: (matchId) => _items.any((m) => m.matchIds.contains(matchId)),
       onChange: _reloadQuietly,
     );
-    _load(showSpinner: false); 
+    _load(showSpinner: false);
+    _expiryTicker = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (!mounted || !_items.any((m) => m.isExpired)) return;
+      setState(() {});
+      _load(showSpinner: false);
+    });
   }
 
   @override
   void dispose() {
+    _expiryTicker?.cancel();
     MatchChatService.matchesChanged.removeListener(_reloadQuietly);
     final channel = _inboxChannel;
     if (channel != null) _service.unsubscribe(channel);
