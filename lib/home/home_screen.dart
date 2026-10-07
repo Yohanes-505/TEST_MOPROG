@@ -10,6 +10,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:Meetcha/features/gift/gift_shop_screen.dart';
+import 'package:Meetcha/features/gift/user_inventory_screen.dart';
 
 final _supabaseClient = Supabase.instance.client;
 
@@ -24,6 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<ProfileModel> dailyBrew = [];
 
   bool isLoading = true;
+  final int dailyLimit = 5;
 
   final SwipeService _swipeService = const SwipeService();
 
@@ -352,7 +355,7 @@ class _HomeHeader extends StatelessWidget {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const GiftShopScreen()),
+                MaterialPageRoute(builder: (context) => GiftShopScreen()), 
               );
             },
           ),
@@ -363,7 +366,7 @@ class _HomeHeader extends StatelessWidget {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const UserInventoryScreen()),
+                MaterialPageRoute(builder: (context) => UserInventoryScreen()), 
               );
             },
           ),
