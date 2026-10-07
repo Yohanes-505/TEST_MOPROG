@@ -48,6 +48,7 @@ class ProfileModel {
   final String? photoUrl;
   final List<String>photoUrls;
   final List<String> interests;
+  final bool isFaceVerified;
 
   // Lokasi (GPS)
   final double? latitude;
@@ -75,6 +76,7 @@ class ProfileModel {
     this.photoUrl,
     this.photoUrls = const [],
     this.interests = const [],
+    this.isFaceVerified = false,
     this.latitude,
     this.longitude,
     this.city,
@@ -127,6 +129,7 @@ class ProfileModel {
               ?.map((e) => e.toString())
               .toList() ??
           const [],
+      isFaceVerified: map['is_face_verified'] as bool? ?? false,
       latitude: (map['latitude'] as num?)?.toDouble(),
       longitude: (map['longitude'] as num?)?.toDouble(),
       city: map['city'] as String?,
@@ -179,6 +182,7 @@ class ProfileModel {
     int? prefMinAge,
     int? prefMaxAge,
     int? prefMaxDistanceKm,
+    bool? isFaceVerified,
   }) {
     return ProfileModel(
       id: id,
@@ -199,6 +203,7 @@ class ProfileModel {
       prefMaxDistanceKm: prefMaxDistanceKm ?? this.prefMaxDistanceKm,
       createdAt: createdAt,
       distanceKm: distanceKm,
+      isFaceVerified: isFaceVerified ?? this.isFaceVerified,
     );
   }
 

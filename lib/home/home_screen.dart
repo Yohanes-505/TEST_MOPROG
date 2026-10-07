@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bumble/models/profile_model.dart';
+import 'package:bumble/screens/match_screen.dart';
 import 'package:bumble/services/block_service.dart';
 import 'package:bumble/services/swipe_service.dart';
 import 'package:bumble/widgets/match_dialog.dart';
@@ -36,7 +37,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> fetchDailyBrew() async {
     setState(() => isLoading = true);
     try {
-      final myId = _supabaseClient.auth.currentUser!.id;
+      final myId = _supabaseClient.auth.currentUser?.id;
+      if (myId == null) {
+        throw StateError('Sesi berakhir. Silakan login ulang.');
+      }
 
       final swiped = await _supabaseClient
           .from('swipes')
@@ -129,7 +133,12 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_none),
-            onPressed: () {},
+            tooltip: 'Match & Pesan',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const MatchChatScreen()),
+              );
+            },
           ),
         ],
       ),
