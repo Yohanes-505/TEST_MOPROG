@@ -36,7 +36,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> fetchDailyBrew() async {
     setState(() => isLoading = true);
     try {
-      final myId = _supabaseClient.auth.currentUser!.id;
+      final myId = _supabaseClient.auth.currentUser?.id;
+      if (myId == null) {
+        throw StateError('Sesi berakhir. Silakan login ulang.');
+      }
 
       final swiped = await _supabaseClient
           .from('swipes')
