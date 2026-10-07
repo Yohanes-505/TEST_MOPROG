@@ -1,4 +1,5 @@
 import 'package:bumble/constants/app_colors.dart';
+import 'package:bumble/controllers/profile_controller.dart';
 import 'package:bumble/home/home_screen.dart';
 import 'package:bumble/profile/profile_tab_screen.dart';
 import 'package:bumble/screens/match_screen.dart';
@@ -20,6 +21,14 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ProfileController.to.refreshLocationIfNeeded(force: true);
+    });
+  }
 
   final List<Widget> _tabs = const [
     HomeScreen(),
