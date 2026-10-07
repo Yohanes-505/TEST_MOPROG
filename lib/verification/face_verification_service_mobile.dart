@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
@@ -34,8 +36,8 @@ class FaceVerificationService {
   static const _profilesTable = 'profiles';
   static const _profilesIdColumn = 'id';
 
-  static const double _minSmile = 0.7;
-  static const double _minEyeOpen = 0.5;
+  static const double _minSmile = 0.5;
+  static const double _minEyeOpen = 0.4;
   static const double _maxHeadAngle = 20;
 
   // Batas kemiripan cosine
@@ -150,12 +152,19 @@ class FaceVerificationService {
     final url = ProfileController.to.me?.photoUrl;
     if (url == null || !url.startsWith('http')) return null;
 
-    final client = HttpClient();
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 10);
     try {
-      final req = await client.getUrl(Uri.parse(url));
-      final res = await req.close();
+      final req = await client
+          .getUrl(Uri.parse(url))
+          .timeout(const Duration(seconds: 10));
+      final res = await req.close().timeout(const Duration(seconds: 15));
       if (res.statusCode != 200) return null;
-      final bytes = await res.fold<List<int>>([], (p, e) => p..addAll(e));
+      final builder = BytesBuilder(copy: false);
+      await for (final chunk in res.timeout(const Duration(seconds: 15))) {
+        builder.add(chunk);
+      }
+      final bytes = builder.takeBytes();
       final f = File(
           '${Directory.systemTemp.path}/profile_${DateTime.now().microsecondsSinceEpoch}.jpg');
       await f.writeAsBytes(bytes);

@@ -80,18 +80,26 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _inForeground = state == AppLifecycleState.resumed;
+    final matchId = _room?.primaryMatchId;
     if (_inForeground) {
+      if (matchId != null) {
+        unawaited(setActiveChat(matchId));
+        unawaited(clearChatNotification(matchId));
+      }
       _syncSilently().then((_) {
         _exitIfExpired();
         _markIncomingAsRead();
         _processQueue();
       });
+    } else {
+      unawaited(setActiveChat(null));
     }
   }
 
   @override
   void dispose() {
     _disposed = true;
+    unawaited(setActiveChat(null));
     WidgetsBinding.instance.removeObserver(this);
     _pollTimer?.cancel();
     _expiryTicker?.cancel();
@@ -121,6 +129,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final room = await _service.openRoom(widget.matchProfile.id);
       if (!mounted) return;
       _room = room;
+      unawaited(setActiveChat(room.primaryMatchId));
+      unawaited(clearChatNotification(room.primaryMatchId));
       _closeChannel();
       final gen = _channelGen;
       _channel = _service.subscribeToRoom(

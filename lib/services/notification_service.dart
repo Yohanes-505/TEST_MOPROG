@@ -13,6 +13,9 @@ final FlutterLocalNotificationsPlugin _localNotifications =
 
 void Function(AppNotification notif)? onNotificationTap;
 
+/// chat yang lagi dibuka di layar
+String? activeChatMatchId;
+
 @pragma('vm:entry-point')
 Future firebaseBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
@@ -34,6 +37,8 @@ Future initNotifications() async {
   debugPrint('FCM Token: $token');
   if (token != null) {
     await _saveTokenToSupabase(token);
+    // app baru nyala, belum ada chat yang dibuka
+    await setActiveChat(null);
   }
 
   _messaging.onTokenRefresh.listen((newToken) {
@@ -58,6 +63,12 @@ Future initNotifications() async {
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
     debugPrint('Notif masuk (foreground): ${message.data}');
     final notif = AppNotification.fromData(message.data);
+
+    // lagi buka chat gak usah nampilin notif
+    if (notif.type == AppNotificationType.message &&
+        notif.relatedId == activeChatMatchId) {
+      return;
+    }
     _showLocalNotification(notif);
   });
 
@@ -85,6 +96,48 @@ Future<void> saveCurrentFcmToken() async {
   final token = await _messaging.getToken();
   if (token != null) {
     await _saveTokenToSupabase(token);
+    await setActiveChat(null);
+  }
+}
+
+/// dipanggil pas masuk chat (matchId) dan pas keluar (null).
+Future<void> setActiveChat(String? matchId) async {
+  activeChatMatchId = matchId;
+
+  final token = await _messaging.getToken();
+  final user = Supabase.instance.client.auth.currentUser;
+  if (token == null || user == null) return;
+
+  try {
+    await Supabase.instance.client
+        .from('device_tokens')
+        .update({'active_match_id': matchId})
+        .eq('user_id', user.id)
+        .eq('token', token);
+  } catch (e) {
+    debugPrint('Gagal set active chat: $e');
+  }
+}
+
+/// hapus notif chat ini dari status bar
+Future<void> clearChatNotification(String matchId) async {
+  await _localNotifications.cancel(0, tag: 'message_$matchId');
+}
+
+/// panggil sebelum signOut() biar notif gak nyasar ke akun lama.
+Future<void> deleteCurrentFcmToken() async {
+  activeChatMatchId = null;
+  final token = await _messaging.getToken();
+  final user = Supabase.instance.client.auth.currentUser;
+  if (token == null || user == null) return;
+  try {
+    await Supabase.instance.client
+        .from('device_tokens')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('token', token);
+  } catch (e) {
+    debugPrint('Gagal hapus token: $e');
   }
 }
 
@@ -139,15 +192,16 @@ String _currentPlatformName() {
 
 Future _showLocalNotification(AppNotification notif) async {
   await _localNotifications.show(
-    DateTime.now().millisecondsSinceEpoch ~/ 1000,
+    0,
     notif.title,
     notif.body,
-    const NotificationDetails(
+    NotificationDetails(
       android: AndroidNotificationDetails(
         'foreground_channel',
         'App Notifications',
         importance: Importance.high,
         priority: Priority.high,
+        tag: '${notif.type.name}_${notif.relatedId ?? ''}',
       ),
     ),
     payload: '${notif.type.name}|${notif.relatedId ?? ''}',

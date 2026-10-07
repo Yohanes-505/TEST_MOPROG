@@ -6,22 +6,28 @@ import '../models/profile_model.dart';
 class BlockService {
   static final _supabase = Supabase.instance.client;
 
-  /// Block
+  // block
   static Future<bool> blockUser({
     required String blockerId,
     required String blockedId,
   }) async {
+    if (blockerId == blockedId) return false;
     try {
       final block = BlockModel(blockerId: blockerId, blockedId: blockedId);
       await _supabase.from('blocks').insert(block.toMap());
       return true;
+    } on PostgrestException catch (e) {
+      // 23505 = sudah pernah diblokir, anggap berhasil
+      if (e.code == '23505') return true;
+      debugPrint('Gagal block user: [${e.code}] ${e.message}');
+      return false;
     } catch (e) {
       debugPrint('Gagal block user: $e');
       return false;
     }
   }
 
-  /// Unblock
+  // unblock
   static Future<bool> unblockUser({
     required String blockerId,
     required String blockedId,
@@ -58,7 +64,7 @@ class BlockService {
     }
   }
 
-  /// Ngmbil daftar id user yang diblock oleh currentUserId
+  // ngmbil daftar id user yang diblock oleh currentUserId
   static Future<List<String>> getBlockedUserIds(String currentUserId) async {
     try {
       final result = await _supabase
@@ -75,7 +81,7 @@ class BlockService {
     }
   }
 
-  /// ngambil daftar profil lengkap dari user yang diblock 
+  // ngambil daftar profil lengkap dari user yang diblock 
   static Future<List<ProfileModel>> getBlockedProfiles(
     String currentUserId,
   ) async {
@@ -97,7 +103,7 @@ class BlockService {
     }
   }
 
-  /// ngambil semua id user yang harus disembunyikan dari swipe stack
+  // ngambil semua id user yang harus disembunyikan dari swipe stack
   static Future<Set<String>> getHiddenUserIds(String currentUserId) async {
     try {
       final blockedByMe = await _supabase

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../services/block_service.dart';
+import 'package:bumble/services/block_service.dart';
+import 'package:bumble/services/match_chat_service.dart';
 
 Future<bool?> showBlockConfirmDialog({
   required BuildContext context,
@@ -39,6 +40,10 @@ class _BlockConfirmDialogState extends State<_BlockConfirmDialog> {
       return;
     }
 
+    // ambil dulu sebelum dialog ditutup
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
     setState(() => _isSubmitting = true);
 
     final success = await BlockService.blockUser(
@@ -49,8 +54,10 @@ class _BlockConfirmDialogState extends State<_BlockConfirmDialog> {
     if (!mounted) return;
 
     if (success) {
-      Navigator.of(context).pop(true);
-      ScaffoldMessenger.of(context).showSnackBar(
+       // refresh tab Match
+      MatchChatService.notifyMatchesChanged();
+      navigator.pop(true);
+      messenger.showSnackBar(
         SnackBar(
           content: Text(
             '${widget.blockedUserName} sudah diblokir. Kalian tidak akan '
@@ -60,7 +67,7 @@ class _BlockConfirmDialogState extends State<_BlockConfirmDialog> {
       );
     } else {
       setState(() => _isSubmitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('Gagal memblokir, coba lagi')),
       );
     }
