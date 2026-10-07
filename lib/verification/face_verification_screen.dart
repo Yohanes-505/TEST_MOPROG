@@ -93,7 +93,7 @@ class _FaceVerificationScreenState extends State<FaceVerificationScreen>
     } catch (e) {
       if (!mounted) return;
       setState(() => _result = FaceCheckResult(
-          passed: false, message: 'Could not process the photo: $e'));
+          passed: false, message: 'Gagal memproses foto: $e'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -105,12 +105,12 @@ class _FaceVerificationScreenState extends State<FaceVerificationScreen>
     try {
       await _service.submit(_image!, _result!);
       if (!mounted) return;
-      Get.snackbar('Verified', 'Your face has been verified.',
+      Get.snackbar('Terverifikasi', 'Wajahmu berhasil diverifikasi.',
           snackPosition: SnackPosition.BOTTOM);
       _finish(verified: true);
     } catch (e) {
       if (!mounted) return;
-      Get.snackbar('Error', 'Could not submit verification: $e',
+      Get.snackbar('Error', 'Gagal mengirim verifikasi: $e',
           snackPosition: SnackPosition.BOTTOM);
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -207,7 +207,7 @@ class _FaceVerificationScreenState extends State<FaceVerificationScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Verify your face',
+                              'Verifikasi Wajah',
                               style: TextStyle(
                                 color: AppColors.textPrimary,
                                 fontSize: 30,
@@ -218,8 +218,8 @@ class _FaceVerificationScreenState extends State<FaceVerificationScreen>
                             ),
                             SizedBox(height: 10),
                             Text(
-                              'Take a quick selfie so we can match it with your '
-                              'profile photo. Verified profiles build more trust.',
+                              'Ambil selfie singkat untuk dicocokkan dengan '
+                              'foto profilmu. Profil terverifikasi lebih dipercaya.',
                               style: TextStyle(
                                 color: AppColors.textSecondary,
                                 fontSize: 15,
@@ -231,7 +231,7 @@ class _FaceVerificationScreenState extends State<FaceVerificationScreen>
                         ),
                       ),
 
-                      // Foto placeholder
+                      // Foto / placeholder
                       Expanded(
                         child: _reveal(
                           start: 0.2,
@@ -336,10 +336,10 @@ class _FaceVerificationScreenState extends State<FaceVerificationScreen>
                                           spacing: 8,
                                           runSpacing: 8,
                                           children: [
-                                            _TipChip('Face the camera'),
-                                            _TipChip('Smile wide'),
-                                            _TipChip('Good lighting'),
-                                            _TipChip('Only you in frame'),
+                                            _TipChip('Hadap kamera'),
+                                            _TipChip('Senyum lebar'),
+                                            _TipChip('Cahaya cukup'),
+                                            _TipChip('Hanya kamu di foto'),
                                           ],
                                         ),
                                       ),
@@ -379,7 +379,7 @@ class _FaceVerificationScreenState extends State<FaceVerificationScreen>
                                     color: AppColors.brown, size: 20),
                                 const SizedBox(width: 8),
                                 Text(
-                                  _image == null ? 'Take selfie' : 'Retake selfie',
+                                  _image == null ? 'Ambil selfie' : 'Ulangi selfie',
                                   style: const TextStyle(
                                     color: AppColors.brown,
                                     fontSize: 16,
@@ -422,7 +422,7 @@ class _FaceVerificationScreenState extends State<FaceVerificationScreen>
                                   : [],
                             ),
                             child: const Text(
-                              'Submit verification',
+                              'Kirim verifikasi',
                               style: TextStyle(
                                 color: AppColors.cream,
                                 fontSize: 16,
@@ -439,7 +439,7 @@ class _FaceVerificationScreenState extends State<FaceVerificationScreen>
                             onPressed:
                                 _busy ? null : () => _finish(verified: false),
                             child: const Text(
-                              'Skip for now',
+                              'Lewati dulu',
                               style: TextStyle(
                                 color: AppColors.matchaDeep,
                                 fontWeight: FontWeight.w700,
