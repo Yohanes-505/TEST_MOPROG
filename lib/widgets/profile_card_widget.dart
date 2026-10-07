@@ -1,21 +1,25 @@
-import 'package:flutter/material.dart';
+import 'package:bumble/constants/app_colors.dart';
 import 'package:bumble/models/profile_model.dart';
 import 'package:bumble/models/report_model.dart';
-import 'package:bumble/constants/app_colors.dart';
 import 'package:bumble/widgets/block_confirm_dialog.dart';
 import 'package:bumble/widgets/report_bottom_sheet.dart';
+import 'package:bumble/widgets/verified_badge.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 
 class ProfileCardWidget extends StatefulWidget {
   final ProfileModel profile;
+
   final VoidCallback onLike;
   final VoidCallback onPass;
+
   final bool isFullCard;
   final bool actionsEnabled;
 
-  /// tampilin menu laporkan n blokir di pojok kanan atas
+  /// Menampilkan menu report dan block.
   final bool showSafetyMenu;
 
-  /// dipanggil abis block berhasil
+  /// Dipanggil setelah block berhasil.
   final VoidCallback? onBlocked;
 
   const ProfileCardWidget({
@@ -35,6 +39,7 @@ class ProfileCardWidget extends StatefulWidget {
 
 class _ProfileCardWidgetState extends State<ProfileCardWidget> {
   final PageController _photoController = PageController();
+
   int _currentPhoto = 0;
 
   @override
@@ -58,43 +63,9 @@ class _ProfileCardWidgetState extends State<ProfileCardWidget> {
       blockedUserName: widget.profile.name,
     );
 
-    if (blocked == true) widget.onBlocked?.call();
-  }
-
-  Widget _buildSafetyMenu() {
-    return Material(
-      color: Colors.black.withValues(alpha: 0.35),
-      shape: const CircleBorder(),
-      child: PopupMenuButton<String>(
-        icon: const Icon(Icons.more_vert, color: Colors.white, size: 20),
-        onSelected: (value) {
-          if (value == 'report') _reportProfile();
-          if (value == 'block') _blockProfile();
-        },
-        itemBuilder: (context) => const [
-          PopupMenuItem(
-            value: 'report',
-            child: Row(
-              children: [
-                Icon(Icons.flag_outlined, color: AppColors.error, size: 20),
-                SizedBox(width: 8),
-                Text('Laporkan'),
-              ],
-            ),
-          ),
-          PopupMenuItem(
-            value: 'block',
-            child: Row(
-              children: [
-                Icon(Icons.block, color: AppColors.error, size: 20),
-                SizedBox(width: 8),
-                Text('Blokir'),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    if (blocked == true) {
+      widget.onBlocked?.call();
+    }
   }
 
   @override
@@ -104,145 +75,35 @@ class _ProfileCardWidgetState extends State<ProfileCardWidget> {
     return Container(
       margin: widget.isFullCard
           ? EdgeInsets.zero
-          : const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          : const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: AppColors.borderSoft),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: AppColors.ink.withValues(alpha: 0.055),
+            blurRadius: 28,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: Stack(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (widget.isFullCard)
-                Expanded(child: _buildPhotoCarousel())
-              else
-                _buildPhotoCarousel(fixedHeight: 260),
-              Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        "${profile.name}${profile.age != null ? ', ${profile.age}' : ''}",
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    if (profile.city != null && profile.city!.isNotEmpty)
-                      Row(
-                        children: [
-                          const Icon(Icons.location_on, size: 16, color: Colors.grey),
-                          const SizedBox(width: 4),
-                          Text(
-                            profile.city!,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
-                if (profile.bio != null && profile.bio!.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    profile.bio!,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
-                  ),
-                ],
-                if (profile.interests.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: profile.interests.take(3).map((interest) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          interest,
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade800),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
-                const SizedBox(height: 14),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _actionButton(
-                      icon: Icons.close,
-                      label: 'Dislike',
-                      color: Colors.grey.shade600,
-                      onTap: widget.actionsEnabled ? widget.onPass : null,
-                    ),
-                    _actionButton(
-                      icon: Icons.favorite,
-                      label: 'Like',
-                      color: AppColors.primaryDeep,
-                      onTap: widget.actionsEnabled ? widget.onLike : null,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-            ],
-          ),
-          if (widget.showSafetyMenu)
-            Positioned(
-              top: 8,
-              right: 8,
-              child: _buildSafetyMenu(),
-            ),
+          if (widget.isFullCard)
+            Expanded(child: _buildPhotoArea())
+          else
+            _buildPhotoArea(fixedHeight: 310),
+          _buildProfileInformation(profile),
         ],
       ),
     );
   }
 
-  /// Carousel foto. Kalau cuma ada 0-1 foto, tampil seperti gambar biasa
-  /// (tidak ada PageView/dots) — supaya tidak ada overhead atau swipe
-  /// kosong untuk profil yang belum upload banyak foto.
-  Widget _buildPhotoCarousel({double? fixedHeight}) {
+  Widget _buildPhotoArea({double? fixedHeight}) {
     final photos = widget.profile.photoUrls;
-
-    if (photos.isEmpty) {
-      return SizedBox(
-        height: fixedHeight,
-        width: double.infinity,
-        child: _placeholder(),
-      );
-    }
-
-    if (photos.length == 1) {
-      return SizedBox(
-        height: fixedHeight,
-        width: double.infinity,
-        child: _networkPhoto(photos.first),
-      );
-    }
 
     return SizedBox(
       height: fixedHeight,
@@ -250,128 +111,617 @@ class _ProfileCardWidgetState extends State<ProfileCardWidget> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          PageView.builder(
-            controller: _photoController,
-            itemCount: photos.length,
-            onPageChanged: (index) => setState(() => _currentPhoto = index),
-            itemBuilder: (context, index) => _networkPhoto(photos[index]),
-          ),
-          // Tap kiri/kanan untuk pindah foto tanpa perlu swipe penuh —
-          // pola umum di dating app (mirip Instagram Stories).
-          Positioned.fill(
-            child: Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onTap: _currentPhoto > 0 ? _goToPrevPhoto : null,
-                  ),
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onTap: _currentPhoto < photos.length - 1
-                        ? _goToNextPhoto
-                        : null,
-                  ),
-                ),
-              ],
+          if (photos.isEmpty)
+            _buildPlaceholder()
+          else if (photos.length == 1)
+            _buildNetworkPhoto(photos.first)
+          else
+            PageView.builder(
+              controller: _photoController,
+              physics: const BouncingScrollPhysics(),
+              itemCount: photos.length,
+              onPageChanged: (index) {
+                if (_currentPhoto == index) {
+                  return;
+                }
+
+                setState(() {
+                  _currentPhoto = index;
+                });
+              },
+              itemBuilder: (context, index) {
+                return _buildNetworkPhoto(photos[index]);
+              },
             ),
-          ),
+
+          // Gradient kecil supaya navigation
+          // foto dan safety button tetap terbaca.
           Positioned(
-            top: 10,
-            left: 10,
-            right: 48,
-            child: Row(
-              children: List.generate(photos.length, (index) {
-                return Expanded(
-                  child: Container(
-                    height: 3,
-                    margin: EdgeInsets.only(
-                      right: index == photos.length - 1 ? 0 : 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: index == _currentPhoto
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(2),
+            left: 0,
+            right: 0,
+            top: 0,
+            height: 100,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.27),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          if (photos.length > 1)
+            Positioned(
+              top: 13,
+              left: 14,
+              right: widget.showSafetyMenu ? 60 : 14,
+              child: _buildPhotoProgress(photos.length),
+            ),
+
+          if (widget.showSafetyMenu)
+            Positioned(
+              top: 14,
+              right: 14,
+              child: _SafetyButton(
+                onReport: _reportProfile,
+                onBlock: _blockProfile,
+              ),
+            ),
+
+          if (photos.length > 1)
+            Positioned.fill(
+              top: 36,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: _currentPhoto > 0 ? _goToPreviousPhoto : null,
                     ),
                   ),
-                );
-              }),
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: _currentPhoto < photos.length - 1
+                          ? _goToNextPhoto
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
             ),
+
+          if (photos.length > 1)
+            Positioned(
+              right: 14,
+              bottom: 14,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeOutCubic,
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: ScaleTransition(
+                      scale: Tween<double>(
+                        begin: 0.92,
+                        end: 1,
+                      ).animate(animation),
+                      child: child,
+                    ),
+                  );
+                },
+                child: Container(
+                  key: ValueKey(_currentPhoto),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.42),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '${_currentPhoto + 1}/${photos.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      height: 1,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhotoProgress(int count) {
+    return Row(
+      children: List.generate(count, (index) {
+        final selected = index == _currentPhoto;
+
+        return Expanded(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            height: 3,
+            margin: EdgeInsets.only(right: index == count - 1 ? 0 : 5),
+            decoration: BoxDecoration(
+              color: selected
+                  ? Colors.white
+                  : Colors.white.withValues(alpha: 0.38),
+              borderRadius: BorderRadius.circular(999),
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.12),
+                        blurRadius: 3,
+                      ),
+                    ]
+                  : null,
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildProfileInformation(ProfileModel profile) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 17, 18, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        _profileTitle(profile),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 22,
+                          height: 1.05,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.55,
+                        ),
+                      ),
+                    ),
+                    if (profile.isFaceVerified) ...[
+                      const SizedBox(width: 6),
+                      const VerifiedBadge(size: 19),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          if (_hasLocation(profile)) ...[
+            const SizedBox(height: 8),
+            _buildLocation(profile),
+          ],
+
+          if (_hasBio(profile)) ...[
+            const SizedBox(height: 11),
+            Text(
+              profile.bio!.trim(),
+              maxLines: widget.isFullCard ? 3 : 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 14,
+                height: 1.45,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ],
+
+          if (profile.interests.isNotEmpty) ...[
+            const SizedBox(height: 13),
+            Wrap(
+              spacing: 7,
+              runSpacing: 7,
+              children: profile.interests
+                  .take(4)
+                  .map((interest) => _InterestChip(label: interest))
+                  .toList(),
+            ),
+          ],
+
+          const SizedBox(height: 18),
+
+          Row(
+            children: [
+              Expanded(
+                child: _ProfileActionButton(
+                  icon: Icons.close_rounded,
+                  label: 'Pass',
+                  foregroundColor: AppColors.textSecondary,
+                  backgroundColor: AppColors.surfaceMuted,
+                  borderColor: AppColors.border,
+                  enabled: widget.actionsEnabled,
+                  onTap: widget.onPass,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _ProfileActionButton(
+                  icon: Icons.favorite_rounded,
+                  label: 'Like',
+                  foregroundColor: Colors.white,
+                  backgroundColor: AppColors.matchaDeep,
+                  borderColor: AppColors.matchaDeep,
+                  enabled: widget.actionsEnabled,
+                  onTap: widget.onLike,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  void _goToPrevPhoto() {
+  Widget _buildLocation(ProfileModel profile) {
+    final locationParts = <String>[];
+
+    if (profile.city != null && profile.city!.trim().isNotEmpty) {
+      locationParts.add(profile.city!.trim());
+    }
+
+    if (profile.distanceLabel.isNotEmpty) {
+      locationParts.add(profile.distanceLabel);
+    }
+
+    return Row(
+      children: [
+        Container(
+          width: 27,
+          height: 27,
+          decoration: BoxDecoration(
+            color: AppColors.matchaSoft.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: const Icon(
+            Icons.location_on_rounded,
+            color: AppColors.matchaDeep,
+            size: 15,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            locationParts.join(' • '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12.5,
+              height: 1.2,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  bool _hasLocation(ProfileModel profile) {
+    return (profile.city != null && profile.city!.trim().isNotEmpty) ||
+        profile.distanceLabel.isNotEmpty;
+  }
+
+  bool _hasBio(ProfileModel profile) {
+    return profile.bio != null && profile.bio!.trim().isNotEmpty;
+  }
+
+  String _profileTitle(ProfileModel profile) {
+    if (profile.age == null) {
+      return profile.name;
+    }
+
+    return '${profile.name}, ${profile.age}';
+  }
+
+  void _goToPreviousPhoto() {
     _photoController.previousPage(
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOut,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
     );
   }
 
   void _goToNextPhoto() {
     _photoController.nextPage(
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOut,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
     );
   }
 
-  Widget _networkPhoto(String url) {
-    final hasValidPhoto = url.isNotEmpty && url.startsWith('http');
-    if (!hasValidPhoto) return _placeholder();
+  Widget _buildNetworkPhoto(String url) {
+    final validPhoto = url.trim().isNotEmpty && url.startsWith('http');
 
-    return Image.network(
-      url,
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) => _placeholder(),
-    );
-  }
+    if (!validPhoto) {
+      return _buildPlaceholder();
+    }
 
-  Widget _placeholder() {
     return Container(
-      color: Colors.grey.shade200,
-      child: const Icon(Icons.person, size: 80, color: Colors.grey),
+      color: AppColors.surfaceMuted,
+      child: Image.network(
+        url,
+        fit: BoxFit.cover,
+        filterQuality: FilterQuality.medium,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) {
+            return child;
+          }
+
+          return Container(
+            color: AppColors.surfaceMuted,
+            alignment: Alignment.center,
+            child: const CupertinoActivityIndicator(
+              radius: 12,
+              color: AppColors.matchaDeep,
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          return _buildPlaceholder();
+        },
+      ),
     );
   }
 
-  Widget _actionButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback? onTap,
-  }) {
-    final effectiveColor = onTap == null ? Colors.grey.shade300 : color;
+  Widget _buildPlaceholder() {
+    return Container(
+      color: AppColors.surfaceMuted,
+      alignment: Alignment.center,
+      child: Container(
+        width: 86,
+        height: 86,
+        decoration: BoxDecoration(
+          color: AppColors.matchaSoft.withValues(alpha: 0.7),
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(
+          Icons.person_rounded,
+          size: 44,
+          color: AppColors.matchaDeep,
+        ),
+      ),
+    );
+  }
+}
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(30),
-          child: Container(
-            width: 56,
-            height: 56,
+class _InterestChip extends StatelessWidget {
+  final String label;
+
+  const _InterestChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+      decoration: BoxDecoration(
+        color: AppColors.matchaSoft.withValues(alpha: 0.52),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: AppColors.primaryBorder.withValues(alpha: 0.65),
+        ),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: AppColors.matchaDeep,
+          fontSize: 11.5,
+          height: 1,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileActionButton extends StatefulWidget {
+  final IconData icon;
+  final String label;
+
+  final Color foregroundColor;
+  final Color backgroundColor;
+  final Color borderColor;
+
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _ProfileActionButton({
+    required this.icon,
+    required this.label,
+    required this.foregroundColor,
+    required this.backgroundColor,
+    required this.borderColor,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  State<_ProfileActionButton> createState() => _ProfileActionButtonState();
+}
+
+class _ProfileActionButtonState extends State<_ProfileActionButton> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value) {
+      return;
+    }
+
+    setState(() {
+      _pressed = value;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final opacity = widget.enabled ? 1.0 : 0.42;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: widget.enabled ? (_) => _setPressed(true) : null,
+      onTapCancel: widget.enabled ? () => _setPressed(false) : null,
+      onTapUp: widget.enabled ? (_) => _setPressed(false) : null,
+      onTap: widget.enabled ? widget.onTap : null,
+      child: AnimatedScale(
+        scale: _pressed ? 0.97 : 1,
+        duration: const Duration(milliseconds: 90),
+        curve: Curves.easeOut,
+        child: AnimatedOpacity(
+          opacity: opacity,
+          duration: const Duration(milliseconds: 160),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            height: 52,
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: effectiveColor, width: 2),
+              color: widget.backgroundColor,
+              borderRadius: BorderRadius.circular(17),
+              border: Border.all(color: widget.borderColor),
+              boxShadow: widget.label == 'Like'
+                  ? [
+                      BoxShadow(
+                        color: AppColors.matchaDeep.withValues(alpha: 0.16),
+                        blurRadius: 14,
+                        offset: const Offset(0, 6),
+                      ),
+                    ]
+                  : null,
             ),
-            child: Icon(icon, color: effectiveColor, size: 28),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(widget.icon, size: 20, color: widget.foregroundColor),
+                const SizedBox(width: 7),
+                Text(
+                  widget.label,
+                  style: TextStyle(
+                    color: widget.foregroundColor,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: effectiveColor,
+      ),
+    );
+  }
+}
+
+class _SafetyButton extends StatefulWidget {
+  final VoidCallback onReport;
+
+  final Future<void> Function() onBlock;
+
+  const _SafetyButton({required this.onReport, required this.onBlock});
+
+  @override
+  State<_SafetyButton> createState() => _SafetyButtonState();
+}
+
+class _SafetyButtonState extends State<_SafetyButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedScale(
+      scale: _pressed ? 0.94 : 1,
+      duration: const Duration(milliseconds: 90),
+      child: PopupMenuButton<String>(
+        tooltip: 'Keamanan',
+        offset: const Offset(0, 44),
+        elevation: 8,
+        color: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        onOpened: () {
+          setState(() {
+            _pressed = true;
+          });
+        },
+        onCanceled: () {
+          setState(() {
+            _pressed = false;
+          });
+        },
+        onSelected: (value) {
+          setState(() {
+            _pressed = false;
+          });
+
+          if (value == 'report') {
+            widget.onReport();
+          }
+
+          if (value == 'block') {
+            widget.onBlock();
+          }
+        },
+        itemBuilder: (context) {
+          return const [
+            PopupMenuItem(
+              value: 'report',
+              child: Row(
+                children: [
+                  Icon(Icons.flag_outlined, color: AppColors.error, size: 20),
+                  SizedBox(width: 10),
+                  Text(
+                    'Laporkan',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+            PopupMenuItem(
+              value: 'block',
+              child: Row(
+                children: [
+                  Icon(Icons.block_rounded, color: AppColors.error, size: 20),
+                  SizedBox(width: 10),
+                  Text('Blokir', style: TextStyle(fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          ];
+        },
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.32),
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+          ),
+          child: const Icon(
+            Icons.more_horiz_rounded,
+            size: 21,
+            color: Colors.white,
           ),
         ),
-      ],
+      ),
     );
   }
 }
