@@ -1,7 +1,9 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/app_notification.dart';
 
@@ -12,12 +14,12 @@ final FlutterLocalNotificationsPlugin _localNotifications =
 void Function(AppNotification notif)? onNotificationTap;
 
 @pragma('vm:entry-point')
-Future<void> firebaseBackgroundHandler(RemoteMessage message) async {
+Future firebaseBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   debugPrint('Notif diterima saat background/killed: ${message.data}');
 }
 
-Future<void> initNotifications() async {
+Future initNotifications() async {
   // buat minta izin notifikasi ke user
   final settings = await _messaging.requestPermission(
     alert: true,
@@ -30,8 +32,14 @@ Future<void> initNotifications() async {
   // nentuin HP mana yangg harus dikirimin notif
   final token = await _messaging.getToken();
   debugPrint('FCM Token: $token');
-  // TODO: kirim token ini ke backend biar Supabase trigger/edge function tau harus
-  // kirim notif ke token mana pas ada match/pesan baru.
+  if (token != null) {
+    await _saveTokenToSupabase(token);
+  }
+
+  _messaging.onTokenRefresh.listen((newToken) {
+    debugPrint('FCM Token refreshed: $newToken');
+    _saveTokenToSupabase(newToken);
+  });
 
   // setup local notification yang buat nampilin notif manual pas app lagi kebuka
   const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -72,7 +80,64 @@ Future<void> initNotifications() async {
   }
 }
 
-Future<void> _showLocalNotification(AppNotification notif) async {
+/// Manggil ini setelah user berhasil login ato signup. initNotifications()
+Future<void> saveCurrentFcmToken() async {
+  final token = await _messaging.getToken();
+  if (token != null) {
+    await _saveTokenToSupabase(token);
+  }
+}
+
+Future _saveTokenToSupabase(String token) async {
+  final currentUser = Supabase.instance.client.auth.currentUser;
+  if (currentUser == null) {
+    debugPrint('Belum login, token belum disimpan ke Supabase');
+    return;
+  }
+
+  try {
+    final supabase = Supabase.instance.client;
+
+    final existing = await supabase
+        .from('device_tokens')
+        .select('user_id')
+        .eq('user_id', currentUser.id)
+        .eq('token', token)
+        .maybeSingle();
+
+    if (existing == null) {
+      await supabase.from('device_tokens').insert({
+        'user_id': currentUser.id,
+        'token': token,
+        'platform': _currentPlatformName(),
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+      debugPrint('Token baru disimpan ke device_tokens');
+    } else {
+      await supabase
+          .from('device_tokens')
+          .update({'updated_at': DateTime.now().toIso8601String()})
+          .eq('user_id', currentUser.id)
+          .eq('token', token);
+      debugPrint('Token sudah ada, updated_at di-refresh');
+    }
+  } catch (e) {
+    debugPrint('Gagal simpan token ke device_tokens: $e');
+  }
+}
+
+String _currentPlatformName() {
+  switch (defaultTargetPlatform) {
+    case TargetPlatform.android:
+      return 'android';
+    case TargetPlatform.iOS:
+      return 'ios';
+    default:
+      return 'other';
+  }
+}
+
+Future _showLocalNotification(AppNotification notif) async {
   await _localNotifications.show(
     DateTime.now().millisecondsSinceEpoch ~/ 1000,
     notif.title,

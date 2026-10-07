@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bumble/models/profile_model.dart';
+import 'package:bumble/screens/match_screen.dart';
+import 'package:bumble/services/block_service.dart';
 import 'package:bumble/services/swipe_service.dart';
 import 'package:bumble/widgets/match_dialog.dart';
 import 'package:bumble/widgets/profile_card_widget.dart';
@@ -35,7 +37,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> fetchDailyBrew() async {
     setState(() => isLoading = true);
     try {
-      final myId = _supabaseClient.auth.currentUser!.id;
+      final myId = _supabaseClient.auth.currentUser?.id;
+      if (myId == null) {
+        throw StateError('Sesi berakhir. Silakan login ulang.');
+      }
 
       final swiped = await _supabaseClient
           .from('swipes')
@@ -47,10 +52,15 @@ class _HomeScreenState extends State<HomeScreen> {
           .map((e) => e['swiped_id'].toString())
           .toList();
 
+      // User yang sudah saling block gak boleh muncul lagi di swipe
+      final hiddenIds = await BlockService.getHiddenUserIds(myId);
+
+      final excludedIds = {...swipedIds, ...hiddenIds}.toList();
+
       var query = _supabaseClient.from('profiles').select().neq('id', myId);
 
-      if (swipedIds.isNotEmpty) {
-        query = query.not('id', 'in', swipedIds);
+      if (excludedIds.isNotEmpty) {
+        query = query.not('id', 'in', excludedIds);
       }
 
       final result = await query.limit(dailyLimit);
@@ -123,7 +133,12 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_none),
-            onPressed: () {},
+            tooltip: 'Match & Pesan',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const MatchChatScreen()),
+              );
+            },
           ),
         ],
       ),
@@ -188,6 +203,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                       handleSwipe(profile, SwipeAction.like),
                                   onPass: () =>
                                       handleSwipe(profile, SwipeAction.dislike),
+                                  onBlocked: () {
+                                    if (mounted) {
+                                      setState(() => dailyBrew
+                                          .removeWhere((p) => p.id == profile.id));
+                                    }
+                                  },
                                 ),
                               );
                             },

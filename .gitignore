@@ -48,3 +48,5 @@ android/.kotlin/
 
 # Widget Preview related
 .widget_preview/
+.vscode/
+lib.zip

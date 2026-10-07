@@ -1,4 +1,5 @@
 import 'package:bumble/models/profile_model.dart';
+import 'package:bumble/services/block_service.dart';
 import 'package:bumble/services/match_chat_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -78,8 +79,12 @@ class SwipeService {
         .eq('swiper_id', myId);
     final respondedIds = mySwipes.map((e) => e['swiped_id'].toString()).toSet();
 
-    final pendingIds =
-        likerIds.where((id) => !respondedIds.contains(id)).toList();
+    // user yg sudah saling block gak boleh nongol di daftar menyukaimu
+    final hiddenIds = await BlockService.getHiddenUserIds(myId);
+
+    final pendingIds = likerIds
+        .where((id) => !respondedIds.contains(id) && !hiddenIds.contains(id))
+        .toList();
     if (pendingIds.isEmpty) return [];
 
     final rows =

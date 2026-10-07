@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bumble/constants/app_colors.dart';
 import 'package:bumble/models/match_preview.dart';
 import 'package:bumble/models/profile_model.dart';
@@ -5,6 +7,7 @@ import 'package:bumble/screens/chat_screen.dart';
 import 'package:bumble/screens/likes_screen.dart';
 import 'package:bumble/services/match_chat_service.dart';
 import 'package:bumble/utils/date_label.dart';
+import 'package:bumble/utils/network_error.dart';
 import 'package:bumble/widgets/user_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -24,26 +27,36 @@ class _MatchChatScreenState extends State<MatchChatScreen> {
   bool _isLoading = true;
   String? _error;
   RealtimeChannel? _inboxChannel;
+  Timer? _expiryTicker;
 
   int _loadSeq = 0;
 
   List<MatchPreview> get _newMatches =>
-      _items.where((m) => !m.hasMessages).toList();
+      _items.where((m) => !m.isExpired && !m.hasMessages).toList();
 
   /// Match yang sudah ada percakapannya.
   List<MatchPreview> get _conversations =>
-      _items.where((m) => m.hasMessages).toList();
+      _items.where((m) => !m.isExpired && m.hasMessages).toList();
 
   @override
   void initState() {
     super.initState();
     MatchChatService.matchesChanged.addListener(_reloadQuietly);
-    _inboxChannel = _service.subscribeToAnyIncomingMessage(_reloadQuietly);
-    _load(showSpinner: false); 
+    _inboxChannel = _service.subscribeToAnyIncomingMessage(
+      isMyMatch: (matchId) => _items.any((m) => m.matchIds.contains(matchId)),
+      onChange: _reloadQuietly,
+    );
+    _load(showSpinner: false);
+    _expiryTicker = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (!mounted || !_items.any((m) => m.isExpired)) return;
+      setState(() {});
+      _load(showSpinner: false);
+    });
   }
 
   @override
   void dispose() {
+    _expiryTicker?.cancel();
     MatchChatService.matchesChanged.removeListener(_reloadQuietly);
     final channel = _inboxChannel;
     if (channel != null) _service.unsubscribe(channel);
@@ -75,7 +88,7 @@ class _MatchChatScreenState extends State<MatchChatScreen> {
       if (!mounted || seq != _loadSeq) return;
       setState(() {
         _isLoading = false;
-        if (_items.isEmpty) _error = 'Gagal memuat match & pesan.';
+        if (_items.isEmpty) _error = friendlyError(e);
       });
     }
   }
@@ -125,8 +138,14 @@ class _MatchChatScreenState extends State<MatchChatScreen> {
         children: [
           const SizedBox(height: 160),
           Center(
-            child: Text(_error!,
-                style: const TextStyle(color: AppColors.textSecondary)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
           ),
           Center(
             child: TextButton(onPressed: _load, child: const Text('Coba lagi')),

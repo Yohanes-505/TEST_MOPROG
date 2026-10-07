@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:bumble/models/profile_model.dart';
+import 'package:bumble/models/report_model.dart';
 import 'package:bumble/constants/app_colors.dart';
+import 'package:bumble/widgets/block_confirm_dialog.dart';
+import 'package:bumble/widgets/report_bottom_sheet.dart';
 
 class ProfileCardWidget extends StatefulWidget {
   final ProfileModel profile;
@@ -9,6 +12,12 @@ class ProfileCardWidget extends StatefulWidget {
   final bool isFullCard;
   final bool actionsEnabled;
 
+  /// tampilin menu laporkan n blokir di pojok kanan atas
+  final bool showSafetyMenu;
+
+  /// dipanggil abis block berhasil
+  final VoidCallback? onBlocked;
+
   const ProfileCardWidget({
     super.key,
     required this.profile,
@@ -16,6 +25,8 @@ class ProfileCardWidget extends StatefulWidget {
     required this.onPass,
     this.isFullCard = true,
     this.actionsEnabled = true,
+    this.showSafetyMenu = true,
+    this.onBlocked,
   });
 
   @override
@@ -32,6 +43,60 @@ class _ProfileCardWidgetState extends State<ProfileCardWidget> {
     super.dispose();
   }
 
+  void _reportProfile() {
+    showReportBottomSheet(
+      context: context,
+      reportedUserId: widget.profile.id,
+      source: ReportSource.profile,
+    );
+  }
+
+  Future<void> _blockProfile() async {
+    final blocked = await showBlockConfirmDialog(
+      context: context,
+      blockedUserId: widget.profile.id,
+      blockedUserName: widget.profile.name,
+    );
+
+    if (blocked == true) widget.onBlocked?.call();
+  }
+
+  Widget _buildSafetyMenu() {
+    return Material(
+      color: Colors.black.withValues(alpha: 0.35),
+      shape: const CircleBorder(),
+      child: PopupMenuButton<String>(
+        icon: const Icon(Icons.more_vert, color: Colors.white, size: 20),
+        onSelected: (value) {
+          if (value == 'report') _reportProfile();
+          if (value == 'block') _blockProfile();
+        },
+        itemBuilder: (context) => const [
+          PopupMenuItem(
+            value: 'report',
+            child: Row(
+              children: [
+                Icon(Icons.flag_outlined, color: AppColors.error, size: 20),
+                SizedBox(width: 8),
+                Text('Laporkan'),
+              ],
+            ),
+          ),
+          PopupMenuItem(
+            value: 'block',
+            child: Row(
+              children: [
+                Icon(Icons.block, color: AppColors.error, size: 20),
+                SizedBox(width: 8),
+                Text('Blokir'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final profile = widget.profile;
@@ -45,21 +110,23 @@ class _ProfileCardWidgetState extends State<ProfileCardWidget> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Stack(
         children: [
-          if (widget.isFullCard)
-            Expanded(child: _buildPhotoCarousel())
-          else
-            _buildPhotoCarousel(fixedHeight: 260),
-          Padding(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (widget.isFullCard)
+                Expanded(child: _buildPhotoCarousel())
+              else
+                _buildPhotoCarousel(fixedHeight: 260),
+              Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,19 +196,27 @@ class _ProfileCardWidgetState extends State<ProfileCardWidget> {
                       icon: Icons.close,
                       label: 'Dislike',
                       color: Colors.grey.shade600,
-                      onTap: widget.actionsEnabled ? widget.onPass : null, 
+                      onTap: widget.actionsEnabled ? widget.onPass : null,
                     ),
                     _actionButton(
                       icon: Icons.favorite,
                       label: 'Like',
                       color: AppColors.primaryDeep,
-                      onTap: widget.actionsEnabled ? widget.onLike : null, 
+                      onTap: widget.actionsEnabled ? widget.onLike : null,
                     ),
                   ],
                 ),
               ],
             ),
           ),
+            ],
+          ),
+          if (widget.showSafetyMenu)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: _buildSafetyMenu(),
+            ),
         ],
       ),
     );
@@ -206,7 +281,7 @@ class _ProfileCardWidgetState extends State<ProfileCardWidget> {
           Positioned(
             top: 10,
             left: 10,
-            right: 10,
+            right: 48,
             child: Row(
               children: List.generate(photos.length, (index) {
                 return Expanded(
@@ -218,7 +293,7 @@ class _ProfileCardWidgetState extends State<ProfileCardWidget> {
                     decoration: BoxDecoration(
                       color: index == _currentPhoto
                           ? Colors.white
-                          : Colors.white.withOpacity(0.4),
+                          : Colors.white.withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),

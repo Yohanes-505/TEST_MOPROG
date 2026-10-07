@@ -8,12 +8,18 @@ class PhotoGridPicker extends StatefulWidget {
   final String userId;
   final List<String> initialPhotos;
   final ProfileService profileService;
+  final ValueChanged<List<String>>? onChanged;
+  final ValueChanged<bool>? onBusyChanged;
+  final double childAspectRatio;
 
   const PhotoGridPicker({
     super.key,
     required this.userId,
     required this.initialPhotos,
     required this.profileService,
+    this.onChanged,
+    this.onBusyChanged,
+    this.childAspectRatio = 0.7,
   });
 
   @override
@@ -31,16 +37,36 @@ class _PhotoGridPickerState extends State<PhotoGridPicker> {
     _photos = List.from(widget.initialPhotos);
   }
 
+  void _setLoading(bool value) {
+    if (!mounted) return;
+    setState(() => _isLoading = value);
+    widget.onBusyChanged?.call(value);
+  }
+
   Future<void> _pickAndUploadPhoto() async {
+    if (widget.userId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sesi tidak ditemukan. Silakan login ulang.')),
+      );
+      return;
+    }
+
     final picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1600,
+      imageQuality: 85,
+    );
     if (image == null) return;
 
-    setState(() => _isLoading = true);
+    _setLoading(true);
 
     try {
       final Uint8List bytes = await image.readAsBytes();
-      final extension = image.name.split('.').last;
+      // Sekarang nama filenya bisa tanpa ekstensi biar ga error pas upload
+      final dot = image.name.lastIndexOf('.');
+      final extension =
+          dot == -1 ? 'jpg' : image.name.substring(dot + 1).toLowerCase();
 
       // Upload via service
       final newUrl = await widget.profileService.uploadPhoto(
@@ -49,22 +75,25 @@ class _PhotoGridPickerState extends State<PhotoGridPicker> {
         fileExtension: extension,
       );
 
-      setState(() {
-        _photos.add(newUrl);
-      });
+      if (mounted) {
+        setState(() => _photos.add(newUrl));
+        widget.onChanged?.call(List.of(_photos));
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal upload foto: $e')),
+          const SnackBar(content: Text('Gagal upload foto. Coba lagi.')),
         );
       }
+      debugPrint('UPLOAD PHOTO ERROR: $e');
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      _setLoading(false);
     }
   }
 
   Future<void> _deletePhoto(String url) async {
-    setState(() => _isLoading = true);
+    if (_isLoading) return;
+    _setLoading(true);
 
     try {
       await widget.profileService.deletePhoto(
@@ -72,17 +101,19 @@ class _PhotoGridPickerState extends State<PhotoGridPicker> {
         photoUrl: url,
       );
 
-      setState(() {
-        _photos.remove(url);
-      });
+      if (mounted) {
+        setState(() => _photos.remove(url));
+        widget.onChanged?.call(List.of(_photos));
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal menghapus foto: $e')),
+          const SnackBar(content: Text('Gagal menghapus foto. Coba lagi.')),
         );
       }
+      debugPrint('DELETE PHOTO ERROR: $e');
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      _setLoading(false);
     }
   }
 
@@ -93,11 +124,11 @@ class _PhotoGridPickerState extends State<PhotoGridPicker> {
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(), 
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3, 
             crossAxisSpacing: 10,
             mainAxisSpacing: 10,
-            childAspectRatio: 0.7, 
+            childAspectRatio: widget.childAspectRatio,
           ),
           itemCount: maxPhotos,
           itemBuilder: (context, index) {
@@ -182,7 +213,7 @@ class _PhotoGridPickerState extends State<PhotoGridPicker> {
         if (_isLoading)
           Positioned.fill(
             child: Container(
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
               child: const Center(
                 child: CircularProgressIndicator(),
               ),

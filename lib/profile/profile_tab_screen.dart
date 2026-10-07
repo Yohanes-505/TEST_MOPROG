@@ -2,14 +2,19 @@ import 'package:bumble/authentication/welcome_screen.dart';
 import 'package:bumble/constants/app_colors.dart';
 import 'package:bumble/controllers/profile_controller.dart';
 import 'package:bumble/models/profile_model.dart';
+import 'package:bumble/profile/blocked_users_screen.dart';
 import 'package:bumble/profile/edit_profile_screen.dart';
 import 'package:bumble/profile/filter_preference_screen.dart';
 import 'package:bumble/profile/safe_dating_tips_screen.dart';
 import 'package:bumble/screens/subscription_screen.dart';
 import 'package:bumble/services/supabase_service.dart';
+import 'package:bumble/verification/face_verification_screen.dart';
+import 'package:bumble/verification/face_verification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+
+final _faceRefresh = 0.obs;
 /// Node flowchart: "Tab: Profile".
 /// Berisi ringkasan profil + pintu masuk ke Edit Profil & Foto,
 /// Filter Preferensi, Subscription, dan Safe Dating Tips.
@@ -75,11 +80,44 @@ class ProfileTabScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               _sectionTitle('Keamanan'),
+              Obx(() {
+                final _ = _faceRefresh.value; // memicu rebuild setelah verifikasi
+                return FutureBuilder<bool>(
+                  future: FaceVerificationService.instance.isVerified(),
+                  builder: (context, snap) {
+                    final verified = snap.data ?? false;
+                    return _menuTile(
+                      icon: verified
+                          ? Icons.verified_rounded
+                          : Icons.face_retouching_natural,
+                      title: verified
+                          ? 'Wajah Terverifikasi'
+                          : 'Verifikasi Wajah',
+                      subtitle: verified
+                          ? 'Akunmu sudah terverifikasi'
+                          : 'Cocokkan selfie dengan foto profilmu',
+                      onTap: verified
+                          ? () {}
+                          : () async {
+                              final ok = await Get.to<bool>(
+                                  () => const FaceVerificationScreen());
+                              if (ok == true) _faceRefresh.value++;
+                            },
+                    );
+                  },
+                );
+              }),
               _menuTile(
                 icon: Icons.health_and_safety_outlined,
                 title: 'Safe Dating Tips',
                 subtitle: 'Panduan aman sebelum bertemu orang baru',
                 onTap: () => Get.to(() => const SafeDatingTipsScreen()),
+              ),
+              _menuTile(
+                icon: Icons.block,
+                title: 'Akun yang Diblokir',
+                subtitle: 'Lihat & buka blokir akun yang pernah kamu blokir',
+                onTap: () => Get.to(() => const BlockedUsersScreen()),
               ),
               const SizedBox(height: 24),
               OutlinedButton.icon(

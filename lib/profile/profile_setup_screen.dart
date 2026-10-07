@@ -1,21 +1,24 @@
 import 'package:bumble/constants/app_colors.dart';
 import 'package:bumble/constants/interest_options.dart';
 import 'package:bumble/controllers/profile_controller.dart';
-import 'package:bumble/home/main_shell.dart';
 import 'package:bumble/models/profile_model.dart';
 import 'package:bumble/widgets/interest_selector.dart';
 import 'package:bumble/widgets/photo_grid_picker.dart';
 import 'package:bumble/services/profile_service.dart';
+import 'package:bumble/verification/face_verification_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show Supabase;
 
 /// Node flowchart: "Profile Setup — Gender, Bio, Interest/Hobby Tags,
 /// Preferensi & Lokasi GPS".
 ///
-/// Dibagi jadi 3 langkah supaya tidak satu form panjang:
-///   1. Tentang kamu  : foto, umur, gender, bio
-///   2. Minat         : interest/hobby tags
-///   3. Lokasi        : izin GPS + filter preferensi awal
+/// Dibagi jadi 4 langkah supaya tidak satu form panjang:
+///   1. Foto          : upload foto (opsional, tanpa validasi)
+///   2. Tentang kamu  : nama, umur, gender, bio (wajib)
+///   3. Minat         : interest/hobby tags
+///   4. Lokasi        : izin GPS + filter preferensi awal
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
 
@@ -32,6 +35,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final TextEditingController bioController = TextEditingController();
 
   int _step = 0;
+  bool _photoBusy = false;
+  bool _isFinishing = false;
+  final _scrollController = ScrollController();
+  final _nameKey = GlobalKey();
+  final _ageKey = GlobalKey();
+  final _genderKey = GlobalKey();
+  String? _nameError;
+  String? _ageError;
+  String? _genderError;
   Gender? _gender;
   List<String> _interests = [];
 
@@ -40,18 +52,49 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   RangeValues _ageRange = const RangeValues(18, 35);
   double _maxDistance = 50;
 
-  static const int _totalSteps = 3;
+  static const int _totalSteps = 4;
 
   @override
   void initState() {
     super.initState();
-    // Nama mungkin sudah terisi dari signup; kalau belum, user isi di sini.
-    nameController.text = controller.me?.name ?? '';
+    _prefillFromAccount();
+  }
+
+  /// ProfileController dibuat di main() sebelum user login, jadi `me` bisa
+  /// kosong / basi saat layar ini dibuka (terutama habis sign up). Muat ulang
+  /// profil user yang sedang login, lalu isi nama dari profil atau metadata
+  /// akun sebagai cadangan.
+  Future<void> _prefillFromAccount() async {
+    final authUser = Supabase.instance.client.auth.currentUser;
+    final metaName = (authUser?.userMetadata?['name'] as String?)?.trim() ?? '';
+    if (metaName.isNotEmpty && nameController.text.isEmpty) {
+      nameController.text = metaName;
+    }
+
+    await controller.loadProfile();
+    if (!mounted) return;
+
+    final me = controller.me;
+    // Jangan menimpa kalau user sudah mulai mengetik.
+    if (nameController.text.trim().isEmpty && (me?.name ?? '').isNotEmpty) {
+      nameController.text = me!.name;
+    }
+    if (ageController.text.isEmpty && me?.age != null) {
+      ageController.text = me!.age.toString();
+    }
+    if (bioController.text.isEmpty && (me?.bio ?? '').isNotEmpty) {
+      bioController.text = me!.bio!;
+    }
+    setState(() {
+      _gender ??= me?.gender;
+      if (_interests.isEmpty && me != null) _interests = List.of(me.interests);
+    });
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _scrollController.dispose();
     nameController.dispose();
     ageController.dispose();
     bioController.dispose();
@@ -63,13 +106,55 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   // ----------------------------------------------------------------
 
   String? _validateStepOne() {
-    if (nameController.text.trim().isEmpty) return 'Isi nama kamu dulu.';
-    final age = int.tryParse(ageController.text.trim());
-    if (age == null) return 'Masukkan umur yang valid.';
-    if (age < 18) return 'Kamu harus berusia minimal 18 tahun.';
-    if (age > 100) return 'Umur tidak valid.';
-    if (_gender == null) return 'Pilih gender kamu.';
-    return null;
+    String? nameErr, ageErr, genderErr;
+
+    if (nameController.text.trim().isEmpty) nameErr = 'Isi nama kamu dulu.';
+
+    final ageText = ageController.text.trim();
+    final age = int.tryParse(ageText);
+    if (ageText.isEmpty) {
+      ageErr = 'Isi umur kamu dulu.';
+    } else if (age == null) {
+      ageErr = 'Umur harus berupa angka.';
+    } else if (age < 18) {
+      ageErr = 'Kamu harus berusia minimal 18 tahun.';
+    } else if (age > 100) {
+      ageErr = 'Umur tidak valid.';
+    }
+
+    if (_gender == null) genderErr = 'Pilih gender kamu.';
+
+    if (mounted) {
+      setState(() {
+        _nameError = nameErr;
+        _ageError = ageErr;
+        _genderError = genderErr;
+      });
+    }
+
+    final firstError = nameErr ?? ageErr ?? genderErr;
+    if (firstError != null) {
+      final key = nameErr != null
+          ? _nameKey
+          : ageErr != null
+              ? _ageKey
+              : _genderKey;
+      _scrollToField(key);
+    }
+    return firstError;
+  }
+
+  void _scrollToField(GlobalKey key) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = key.currentContext;
+      if (ctx == null) return;
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+        alignment: 0.1,
+      );
+    });
   }
 
   String? _validateStepTwo() {
@@ -89,10 +174,23 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Future<void> _onNext() async {
-    final error = _step == 0 ? _validateStepOne() : _validateStepTwo();
-    if (_step < 2 && error != null) {
-      Get.snackbar('Belum lengkap', error,
+    FocusScope.of(context).unfocus();
+
+    if (_photoBusy) {
+      Get.snackbar('Tunggu sebentar', 'Foto kamu masih diproses.',
           snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+
+    // Langkah 0 (foto) dibuat opsional sehingga bisa lanjut ke setup berikutnya.
+    final error = switch (_step) {
+      1 => _validateStepOne(),
+      2 => _validateStepTwo(),
+      _ => null,
+    };
+    if (error != null) {
+      Get.snackbar('Belum lengkap', error,
+          snackPosition: SnackPosition.TOP);
       return;
     }
 
@@ -105,6 +203,22 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Future<void> _finish() async {
+    if (_isFinishing) return;
+
+    // Ini buat validasi ulang, biar ga ada yang terlewat
+    final errorOne = _validateStepOne();
+    if (errorOne != null) {
+      _goTo(1); // Ini buat selesain masalah ketika klik "lanjut" terdapat data yang belum lengkap sehingga direct ke profile setup no 1
+      Get.snackbar('Belum lengkap', errorOne, snackPosition: SnackPosition.TOP);
+      return;
+    }
+    final errorTwo = _validateStepTwo();
+    if (errorTwo != null) {
+      _goTo(2);
+      Get.snackbar('Belum lengkap', errorTwo, snackPosition: SnackPosition.TOP);
+      return;
+    }
+
     final profile = controller.me;
     if (profile == null || !profile.hasLocation) {
       Get.snackbar(
@@ -115,95 +229,191 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       return;
     }
 
-    final saved = await controller.saveProfile(
-      name: nameController.text.trim(),
-      age: int.parse(ageController.text.trim()),
-      bio: bioController.text.trim(),
-      gender: _gender,
-      interests: _interests,
-    );
-    if (!saved) return;
+    _isFinishing = true;
+    try {
+      final saved = await controller.saveProfile(
+        name: nameController.text.trim(),
+        age: int.parse(ageController.text.trim()),
+        bio: bioController.text.trim(),
+        gender: _gender,
+        interests: _interests,
+      );
+      if (!saved) return;
 
-    await controller.savePreferences(
-      prefGender: _prefGender,
-      minAge: _ageRange.start.round(),
-      maxAge: _ageRange.end.round(),
-      maxDistanceKm: _maxDistance.round(),
-    );
+      final prefsSaved = await controller.savePreferences(
+        prefGender: _prefGender,
+        minAge: _ageRange.start.round(),
+        maxAge: _ageRange.end.round(),
+        maxDistanceKm: _maxDistance.round(),
+      );
+      if (!prefsSaved) return;
 
-    await controller.loadProfile();
+      await controller.loadProfile();
 
-    Get.offAll(() => const MainShell());
+      Get.offAll(() => const FaceVerificationScreen(fromOnboarding: true));
+    } finally {
+      _isFinishing = false;
+    }
   }
 
   // ----------------------------------------------------------------
   // UI
   // ----------------------------------------------------------------
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _header(),
-            Expanded(
-              child: PageView(
-                controller: _pageController,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  _stepAboutYou(),
-                  _stepInterests(),
-                  _stepLocation(),
-                ],
+ @override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: AppColors.background,
+    body: SafeArea(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            children: [
+              _header(),
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    _stepPhotos(),
+                    _stepAboutYou(),
+                    _stepInterests(),
+                    _stepLocation(),
+                  ],
+                ),
               ),
-            ),
-            _footer(),
-          ],
+              _footer(),
+            ],
+          ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _header() {
-    const titles = ['Tentang Kamu', 'Minat Kamu', 'Lokasi & Preferensi'];
-    const subtitles = [
-      'Isi data dasar supaya orang lain kenal kamu',
-      'Pilih minat agar kami cocokkan dengan orang yang mirip',
-      'Kami butuh lokasi untuk mencari orang di sekitarmu',
-    ];
+  final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+  const titles = [
+    'Foto Kamu',
+    'Tentang Kamu',
+    'Minat Kamu',
+    'Lokasi & Preferensi',
+  ];
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+  const subtitles = [
+    'Tambahkan foto supaya profilmu lebih menarik.',
+    'Bantu kami mengenalmu sedikit lebih dekat.',
+    'Pilih hal-hal yang membuat kamu jadi dirimu.',
+    'Atur siapa yang ingin kamu temui di sekitar kamu.',
+  ];
+
+  return Padding(
+    padding: const EdgeInsets.fromLTRB(24, 22, 24, 10),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Langkah ${_step + 1} dari $_totalSteps',
+              style: const TextStyle(
+                color: AppColors.matchaDeep,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.3,
+              ),
+            ),
+            const Spacer(),
+            const Text(
+              'MEETCHA',
+              style: TextStyle(
+                color: AppColors.sage,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+
+        Row(
+          children: List.generate(_totalSteps, (i) {
+            final active = i <= _step;
+
+            return Expanded(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                height: 5,
+                margin: EdgeInsets.only(
+                  right: i == _totalSteps - 1 ? 0 : 7,
+                ),
+                decoration: BoxDecoration(
+                  color: active
+                      ? AppColors.matcha
+                      : AppColors.matchaSoft,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            );
+          }),
+        ),
+
+        if (!keyboardOpen) ...[
+        const SizedBox(height: 24),
+
+        Text(
+          titles[_step],
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 28,
+            height: 1.1,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.5,
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        Text(
+          subtitles[_step],
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 14,
+            height: 1.45,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        ],
+      ],
+    ),
+  );
+}
+
+  Widget _stepPhotos() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: List.generate(_totalSteps, (i) {
-              return Expanded(
-                child: Container(
-                  height: 4,
-                  margin: EdgeInsets.only(right: i == _totalSteps - 1 ? 0 : 6),
-                  decoration: BoxDecoration(
-                    color: i <= _step
-                        ? AppColors.primary
-                        : Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            titles[_step],
-            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            subtitles[_step],
-            style: const TextStyle(
-                fontSize: 14, color: AppColors.textSecondary),
+          Obx(() => PhotoGridPicker(
+                key: ValueKey(controller.me?.id ?? 'no-profile'),
+                userId: const ProfileService().currentUserId ?? '',
+                initialPhotos: controller.me?.photoUrls ?? const [],
+                profileService: const ProfileService(),
+                onBusyChanged: (busy) {
+                  if (mounted) setState(() => _photoBusy = busy);
+                },
+              )),
+          const SizedBox(height: 12),
+          const Center(
+            child: Text(
+              'Foto profil (opsional, tapi sangat disarankan).\nFoto pertama jadi foto utama.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
           ),
         ],
       ),
@@ -212,44 +422,54 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   Widget _stepAboutYou() {
     return SingleChildScrollView(
+      controller: _scrollController,
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Obx(() => PhotoGridPicker(
-                userId: controller.me?.id ?? '',
-                initialPhotos: controller.me?.photoUrls ?? [],
-                profileService: const ProfileService(),
-              )),
-          const SizedBox(height: 8),
-          const Center(
-            child: Text(
-              'Foto profil (opsional, tapi sangat disarankan)',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          const Text(
+            'Data diri (wajib diisi)',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 28),
-          _label('Nama'),
+          const SizedBox(height: 14),
+          _label('Nama', key: _nameKey),
           TextField(
             controller: nameController,
             textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            onChanged: (_) {
+              if (_nameError != null) setState(() => _nameError = null);
+            },
             decoration: _inputDecoration(
               hint: 'Nama yang tampil di profil kamu',
               icon: Icons.person_outline,
+              errorText: _nameError,
             ),
           ),
           const SizedBox(height: 20),
-          _label('Umur'),
+          _label('Umur', key: _ageKey),
           TextField(
             controller: ageController,
+            onChanged: (_) {
+              if (_ageError != null) setState(() => _ageError = null);
+            },
             keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(3),
+            ],
             decoration: _inputDecoration(
               hint: 'Masukkan umur kamu',
               icon: Icons.cake_outlined,
+              errorText: _ageError,
             ),
           ),
           const SizedBox(height: 20),
-          _label('Gender'),
+          _label('Gender', key: _genderKey),
           Wrap(
             spacing: 10,
             children: Gender.values.map((g) {
@@ -257,7 +477,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               return ChoiceChip(
                 label: Text(g.label),
                 selected: isSelected,
-                onSelected: (_) => setState(() => _gender = g),
+                onSelected: (_) => setState(() {
+                  _gender = g;
+                  _genderError = null;
+                }),
                 selectedColor: AppColors.primary,
                 backgroundColor: Colors.grey.shade100,
                 labelStyle: TextStyle(
@@ -275,6 +498,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               );
             }).toList(),
           ),
+          if (_genderError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, left: 4),
+              child: Text(
+                _genderError!,
+                style: const TextStyle(color: AppColors.error, fontSize: 12),
+              ),
+            ),
           const SizedBox(height: 20),
           _label('Bio'),
           TextField(
@@ -454,69 +685,105 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Widget _footer() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-      child: Row(
-        children: [
-          if (_step > 0)
-            Expanded(
-              child: SizedBox(
-                height: 50,
-                child: OutlinedButton(
-                  onPressed: () => _goTo(_step - 1),
-                  child: const Text('Kembali'),
+  return Container(
+    padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
+    decoration: const BoxDecoration(
+      color: AppColors.background,
+      border: Border(
+        top: BorderSide(
+          color: AppColors.border,
+          width: 0.7,
+        ),
+      ),
+    ),
+    child: Row(
+      children: [
+        if (_step > 0)
+          Expanded(
+            child: SizedBox(
+              height: 54,
+              child: OutlinedButton(
+                onPressed: () => _goTo(_step - 1),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.matchaDeep,
+                  side: const BorderSide(
+                    color: AppColors.primaryBorder,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+                child: const Text(
+                  'Kembali',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
-          if (_step > 0) const SizedBox(width: 12),
-          Expanded(
-            flex: 2,
-            child: SizedBox(
-              height: 50,
-              child: Obx(() {
-                final busy = controller.isSaving.value;
-                return ElevatedButton(
-                  onPressed: busy ? null : _onNext,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: busy
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.onPrimary,
-                          ),
-                        )
-                      : Text(
-                          _step == _totalSteps - 1 ? 'Selesai' : 'Lanjut',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: AppColors.onPrimary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                );
-              }),
-            ),
           ),
-        ],
-      ),
-    );
-  }
 
-  Widget _label(String text) => Padding(
+        if (_step > 0) const SizedBox(width: 12),
+
+        Expanded(
+          flex: 2,
+          child: SizedBox(
+            height: 54,
+            child: Obx(() {
+              final busy = controller.isSaving.value || _photoBusy;
+
+              return ElevatedButton(
+                onPressed: busy ? null : _onNext,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.onPrimary,
+                  disabledBackgroundColor: AppColors.sage,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+                child: busy
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.onPrimary,
+                        ),
+                      )
+                    : Text(
+                        _step == _totalSteps - 1
+                            ? 'Selesai'
+                            : 'Lanjut',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+              );
+            }),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+  Widget _label(String text, {Key? key}) => Padding(
+        key: key,
         padding: const EdgeInsets.only(bottom: 8),
         child: Text(text, style: const TextStyle(fontWeight: FontWeight.w600)),
       );
 
-  InputDecoration _inputDecoration({required String hint, IconData? icon}) {
+  InputDecoration _inputDecoration({
+    required String hint,
+    IconData? icon,
+    String? errorText,
+  }) {
     return InputDecoration(
       hintText: hint,
+      errorText: errorText,
       prefixIcon: icon == null ? null : Icon(icon),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
     );

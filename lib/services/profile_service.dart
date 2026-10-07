@@ -129,13 +129,11 @@ class ProfileService {
     final current = await getProfileById(userId);
     final updatedUrls = [...(current?.photoUrls ?? const []), publicUrl];
 
-    await supabase
-        .from(_table)
-        .update({
-          'photo_urls': updatedUrls,
-          'photo_url': updatedUrls.first,
-        })
-        .eq('id', userId);
+    await supabase.from(_table).upsert({
+      'id': userId,
+      'photo_urls': updatedUrls,
+      'photo_url': updatedUrls.first,
+    });
 
     return publicUrl;
   }
