@@ -8,6 +8,7 @@ import 'package:bumble/profile/filter_preference_screen.dart';
 import 'package:bumble/profile/safe_dating_tips_screen.dart';
 import 'package:bumble/screens/subscription_screen.dart';
 import 'package:bumble/services/supabase_service.dart';
+import 'package:bumble/services/session_timeout_service.dart';
 import 'package:bumble/verification/face_verification_screen.dart';
 import 'package:bumble/verification/face_verification_service.dart';
 import 'package:flutter/material.dart';
@@ -326,6 +327,7 @@ class ProfileTabScreen extends StatelessWidget {
     if (confirmed != true) return;
 
     await supabase.auth.signOut();
+    await SessionTimeoutService.clear();
     Get.delete<ProfileController>(force: true);
     Get.offAll(() => const WelcomeScreen());
   }
