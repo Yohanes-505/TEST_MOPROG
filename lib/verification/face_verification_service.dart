@@ -33,7 +33,6 @@ class FaceVerificationService {
 
   static const _profilesTable = 'profiles';
   static const _profilesIdColumn = 'id';
-  static const _profilePhotoColumn = 'photo_url';
 
   static const double _minSmile = 0.7;
   static const double _minEyeOpen = 0.5;
