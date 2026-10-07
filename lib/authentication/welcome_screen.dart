@@ -3,15 +3,15 @@ import 'package:bumble/constants/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-/// Layar pembuka Meetcha — latar teal gelap dengan aksen lime,
-/// mengikuti nuansa referensi desain.
+/// Layar pembuka Meetcha — latar cream (FFF0D6) dengan simbol logo cokelat
+/// dan wordmark "MEETCHA" beserta tagline, semuanya berupa gambar.
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.ink,
+      backgroundColor: AppColors.cream,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -19,33 +19,22 @@ class WelcomeScreen extends StatelessWidget {
             children: [
               const Spacer(flex: 3),
 
+              // Simbol: dua kartu profil dengan orbit
               Image.asset(
-                "images/logo.png",
-                height: 120,
+                "images/logo_mark.png",
+                width: 230,
                 fit: BoxFit.contain,
               ),
 
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
 
-              const Text(
-                "Welcome to Matcha!",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              const Text(
-                "Let's start your match up!",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: AppColors.mist,
-                  fontWeight: FontWeight.w500,
+              // Wordmark + tagline "Real people. Better connections."
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Image.asset(
+                  "images/logo_wordmark.png",
+                  width: double.infinity,
+                  fit: BoxFit.contain,
                 ),
               ),
 
@@ -57,8 +46,8 @@ class WelcomeScreen extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: () => Get.to(() => const LoginScreen()),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: AppColors.onPrimary,
+                    backgroundColor: AppColors.brown,
+                    foregroundColor: AppColors.cream,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),

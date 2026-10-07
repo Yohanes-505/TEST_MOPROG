@@ -1,11 +1,11 @@
 {
-    "name": "bumble",
-    "short_name": "bumble",
+    "name": "Meetcha",
+    "short_name": "Meetcha",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#FFF0D6",
+    "theme_color": "#FFF0D6",
+    "description": "Meetcha — Real people. Better connections.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
