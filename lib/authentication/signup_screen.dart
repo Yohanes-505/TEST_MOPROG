@@ -5,6 +5,7 @@ import 'package:bumble/controllers/profile_controller.dart';
 import 'package:bumble/profile/profile_setup_screen.dart';
 import 'package:bumble/services/notification_service.dart';
 import 'package:bumble/services/supabase_service.dart';
+import 'package:bumble/services/session_timeout_service.dart';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -152,6 +153,8 @@ class SignUpScreenState extends State<SignUpScreen>
         Get.back();
         return;
       }
+
+      await SessionTimeoutService.touch();
 
       // Simpan data awal profil.
       try {
