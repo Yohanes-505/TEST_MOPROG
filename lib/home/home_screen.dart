@@ -63,13 +63,16 @@ class _HomeScreenState extends State<HomeScreen> {
         query = query.not('id', 'in', excludedIds);
       }
 
-      final result = await query.limit(dailyLimit);
+      final result = await query.limit(50);
+
+      final candidates = (result as List)
+          .map((e) => ProfileModel.fromMap(e))
+          .toList()
+        ..shuffle();
 
       if (mounted) {
         setState(() {
-          dailyBrew = (result as List)
-              .map((e) => ProfileModel.fromMap(e))
-              .toList();
+          dailyBrew = candidates.take(dailyLimit).toList();
           isLoading = false;
         });
       }
@@ -126,7 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          "Matcha",
+          "Meetcha",
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: false,
