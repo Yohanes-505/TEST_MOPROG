@@ -1,5 +1,6 @@
 import 'package:bumble/models/profile_model.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:bumble/services/location_service.dart';
 import 'package:bumble/services/profile_service.dart';
 import 'package:get/get.dart';
@@ -10,7 +11,8 @@ import 'package:get/get.dart';
 ///
 /// Daftarkan sekali saja, misalnya lewat `Get.put(ProfileController())`
 /// di `main.dart`, atau `Get.lazyPut` sebelum masuk Home.
-class ProfileController extends GetxController {
+class ProfileController extends GetxController
+    with WidgetsBindingObserver {
   final ProfileService _profileService = const ProfileService();
   final LocationService _locationService = const LocationService();
 
@@ -28,12 +30,36 @@ class ProfileController extends GetxController {
   final RxBool isSaving = false.obs;
   final RxBool isLocating = false.obs;
 
+  /// Lokasi yang lebih tua dari ini dianggap basi dan diperbarui otomatis
+  /// saat aplikasi dibuka kembali.
+  static const Duration _locationMaxAge = Duration(minutes: 5);
+
+  /// Jeda minimal antar refresh otomatis (supaya tidak spam GPS).
+  static const Duration _autoRetryGap = Duration(seconds: 30);
+  DateTime? _lastAutoRefresh;
+
   ProfileModel? get me => profile.value;
 
   @override
   void onInit() {
     super.onInit();
+    WidgetsBinding.instance.addObserver(this);
     loadProfile();
+  }
+
+  @override
+  void onClose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.onClose();
+  }
+
+  /// Saat user kembali ke aplikasi (mis. setelah menyalakan GPS di
+  /// pengaturan atau berpindah tempat), segarkan lokasi kalau sudah basi.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      refreshLocationIfNeeded();
+    }
   }
 
   Future<void> loadProfile() async {
@@ -129,26 +155,63 @@ class ProfileController extends GetxController {
     }
   }
 
+  // Ini buat perbaruin lokasi setiap beberapa saat (kalau keluar dari aplikasi sekitar 30 menitan maksimal).
+  Future<void> refreshLocationIfNeeded({bool force = false}) async {
+    if (isClosed || isLocating.value) return;
+    if (_profileService.currentUserId == null) return;
+
+    if (profile.value == null) {
+      await loadProfile();
+    }
+    final p = profile.value;
+    if (isClosed || p == null) return;
+
+    final updatedAt = p.locationUpdatedAt;
+    final isStale = !p.hasLocation ||
+        updatedAt == null ||
+        DateTime.now().difference(updatedAt) > _locationMaxAge;
+    if (!force && !isStale) return;
+
+    final last = _lastAutoRefresh;
+    if (!force &&
+        last != null &&
+        DateTime.now().difference(last) < _autoRetryGap) {
+      return;
+    }
+    _lastAutoRefresh = DateTime.now();
+
+    await refreshLocation(silent: true);
+  }
+
   /// Ambil lokasi GPS lalu simpan ke profil.
   Future<bool> refreshLocation({bool silent = false}) async {
+    if (isClosed) return false;
     final userId = _profileService.currentUserId;
     if (userId == null) return false;
-
+    if (isLocating.value) return false;
     isLocating.value = true;
+
     try {
-      final result = await _locationService.getCurrentLocation();
+      final result = await _locationService.getCurrentLocation(
+        requestPermission: !silent,
+      );
+
+      if (isClosed) return false;
 
       if (!result.isSuccess) {
-        if (!silent) _error(result.errorMessage!);
+        if (!silent) _locationError(result);
         return false;
       }
 
-      profile.value = await _profileService.saveLocation(
+      final saved = await _profileService.saveLocation(
         userId: userId,
         latitude: result.latitude!,
         longitude: result.longitude!,
         city: result.city,
       );
+
+      if (isClosed) return false;
+      profile.value = saved;
 
       if (!silent) {
         Get.snackbar(
@@ -160,12 +223,12 @@ class ProfileController extends GetxController {
         );
       }
       return true;
-      } catch (e) {
-      debugPrint('LOCATION SAVE ERROR: $e');
-      if (!silent) _error('Gagal menyimpan lokasi.');
+    } catch (e, st) {
+      debugPrint('LOCATION SAVE ERROR: $e\n$st');
+      if (!silent && !isClosed) _error('Gagal menyimpan lokasi.');
       return false;
     } finally {
-      isLocating.value = false;
+      if (!isClosed) isLocating.value = false;
     }
   }
 
@@ -197,6 +260,34 @@ class ProfileController extends GetxController {
   }
 
   Future<void> openLocationSettings() => _locationService.openSettings();
+
+  // Jika error atau belum menyalakan pengaturan maka bakal muncul buka pengaturan.
+  void _locationError(LocationResult result) {
+    final VoidCallback? openAction;
+    switch (result.failure) {
+      case LocationFailure.permissionDeniedForever:
+        openAction = () => _locationService.openSettings();
+        break;
+      case LocationFailure.serviceDisabled:
+        openAction = () => _locationService.openLocationServiceSettings();
+        break;
+      default:
+        openAction = null;
+    }
+
+    Get.snackbar(
+      'Error',
+      result.errorMessage ?? 'Gagal mengambil lokasi.',
+      snackPosition: SnackPosition.BOTTOM,
+      duration: const Duration(seconds: 5),
+      mainButton: openAction == null
+          ? null
+          : TextButton(
+              onPressed: openAction,
+              child: const Text('Buka Pengaturan'),
+            ),
+    );
+  }
 
   void _error(String message) {
     Get.snackbar('Error', message, snackPosition: SnackPosition.BOTTOM);
