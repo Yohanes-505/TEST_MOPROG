@@ -4,6 +4,7 @@ import 'package:bumble/models/chat_message.dart';
 import 'package:bumble/models/profile_model.dart';
 import 'package:bumble/models/report_model.dart';
 import 'package:bumble/services/match_chat_service.dart';
+import 'package:bumble/services/notification_service.dart';
 import 'package:bumble/utils/date_label.dart';
 import 'package:bumble/utils/match_expiry.dart';
 import 'package:bumble/utils/network_error.dart';
@@ -78,18 +79,26 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _inForeground = state == AppLifecycleState.resumed;
+    final matchId = _room?.primaryMatchId;
     if (_inForeground) {
+      if (matchId != null) {
+        unawaited(setActiveChat(matchId));
+        unawaited(clearChatNotification(matchId));
+      }
       _syncSilently().then((_) {
         _exitIfExpired();
         _markIncomingAsRead();
         _processQueue();
       });
+    } else {
+      unawaited(setActiveChat(null));
     }
   }
 
   @override
   void dispose() {
     _disposed = true;
+    unawaited(setActiveChat(null));
     WidgetsBinding.instance.removeObserver(this);
     _pollTimer?.cancel();
     _expiryTicker?.cancel();
@@ -119,6 +128,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final room = await _service.openRoom(widget.matchProfile.id);
       if (!mounted) return;
       _room = room;
+      unawaited(setActiveChat(room.primaryMatchId));
+      unawaited(clearChatNotification(room.primaryMatchId));
       _closeChannel();
       final gen = _channelGen;
       _channel = _service.subscribeToRoom(
