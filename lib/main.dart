@@ -28,7 +28,11 @@ Future<void> main() async {
     publishableKey: 'sb_publishable_IJ5sQ0p_YZrmMzSKS__o_Q_U61cdrQT',
   );
 
-  await initNotifications();
+    try {
+    await initNotifications();
+  } catch (e) {
+    debugPrint('initNotifications gagal: $e');
+  }
 
   onNotificationTap = (AppNotification notif) {
     final nav = navigatorKey.currentState;
@@ -68,12 +72,12 @@ final ThemeData _meetchaTheme = ThemeData(
   useMaterial3: true,
   scaffoldBackgroundColor: AppColors.background,
   colorScheme: ColorScheme.fromSeed(
-    seedColor: AppColors.lime,
+    seedColor: AppColors.sage,
     primary: AppColors.primaryDeep,
     onPrimary: Colors.white,
     primaryContainer: AppColors.primary,
     onPrimaryContainer: AppColors.onPrimary,
-    secondary: AppColors.green,
+    secondary: AppColors.sage,
     onSecondary: AppColors.ink,
     error: AppColors.error,
     surface: AppColors.background,
