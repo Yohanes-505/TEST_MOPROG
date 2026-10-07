@@ -24,6 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<ProfileModel> dailyBrew = [];
 
   bool isLoading = true;
+  final int dailyLimit = 10;
 
   final int dailyLimit = 5;
 

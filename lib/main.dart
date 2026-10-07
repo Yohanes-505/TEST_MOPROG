@@ -1,5 +1,6 @@
 import 'package:bumble/authentication/auth_gate.dart';
 import 'package:bumble/authentication/welcome_screen.dart';
+import 'package:bumble/widgets/meetcha_loading.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:get/get.dart';
@@ -22,8 +23,19 @@ import 'services/supabase_service.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
+/// Animasi tampil minimal segini supaya tidak berkedip kalau init sangat cepat.
+const Duration _minSplash = Duration(milliseconds: 1200);
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Langsung tampilkan animasi; init berat dikerjakan di dalam _Bootstrap.
+  runApp(const _Bootstrap());
+}
+
+/// Semua inisialisasi yang dulu ada di main().
+Future<void> _initialize() async {
+  final minShow = Future.delayed(_minSplash);
 
   // Firebase
   await Firebase.initializeApp(
@@ -105,7 +117,66 @@ Future<void> main() async {
     permanent: true,
   );
 
-  runApp(const MyApp());
+  await minShow;
+}
+
+/// Menampilkan animasi selama init berjalan, lalu berganti ke MyApp.
+class _Bootstrap extends StatefulWidget {
+  const _Bootstrap();
+
+  @override
+  State<_Bootstrap> createState() => _BootstrapState();
+}
+
+class _BootstrapState extends State<_Bootstrap> {
+  late Future<void> _init = _initialize();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: _init,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.done &&
+            !snapshot.hasError) {
+          return const MyApp();
+        }
+
+        if (snapshot.hasError) {
+          debugPrint('Init gagal: ${snapshot.error}');
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: Scaffold(
+              backgroundColor: AppColors.cream,
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Gagal memulai aplikasi.\nPeriksa koneksi internetmu.',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () => setState(() => _init = _initialize()),
+                        child: const Text('Coba lagi'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return const MaterialApp(
+          debugShowCheckedModeBanner: false,
+          home: MeetchaLoadingScreen(),
+        );
+      },
+    );
+  }
 }
 
 class MyApp extends StatefulWidget {
