@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:bumble/constants/app_colors.dart';
+import 'package:Meetcha/constants/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 

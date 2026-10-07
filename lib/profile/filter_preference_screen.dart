@@ -1,6 +1,6 @@
-import 'package:bumble/constants/app_colors.dart';
-import 'package:bumble/controllers/profile_controller.dart';
-import 'package:bumble/models/profile_model.dart';
+import 'package:Meetcha/constants/app_colors.dart';
+import 'package:Meetcha/controllers/profile_controller.dart';
+import 'package:Meetcha/models/profile_model.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 

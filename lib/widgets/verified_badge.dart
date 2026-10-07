@@ -1,4 +1,4 @@
-import 'package:bumble/constants/app_colors.dart';
+import 'package:Meetcha/constants/app_colors.dart';
 import 'package:flutter/material.dart';
 
 /// centang kecil di samping nama untuk user yang sudah verifikasi wajah

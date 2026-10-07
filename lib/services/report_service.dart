@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:bumble/models/report_model.dart';
+import 'package:Meetcha/models/report_model.dart';
 
 class ReportService {
   static final _supabase = Supabase.instance.client;

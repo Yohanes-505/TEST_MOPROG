@@ -1,8 +1,8 @@
-import 'package:bumble/models/profile_model.dart';
+import 'package:Meetcha/models/profile_model.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:bumble/services/location_service.dart';
-import 'package:bumble/services/profile_service.dart';
+import 'package:Meetcha/services/location_service.dart';
+import 'package:Meetcha/services/profile_service.dart';
 import 'package:get/get.dart';
 
 /// State profil user yang sedang login.

@@ -1,11 +1,11 @@
-import 'package:bumble/constants/app_colors.dart';
-import 'package:bumble/models/profile_model.dart';
-import 'package:bumble/screens/match_screen.dart';
-import 'package:bumble/screens/subscription_screen.dart';
-import 'package:bumble/services/block_service.dart';
-import 'package:bumble/services/swipe_service.dart';
-import 'package:bumble/widgets/match_dialog.dart';
-import 'package:bumble/widgets/profile_card_widget.dart';
+import 'package:Meetcha/constants/app_colors.dart';
+import 'package:Meetcha/models/profile_model.dart';
+import 'package:Meetcha/screens/match_screen.dart';
+import 'package:Meetcha/screens/subscription_screen.dart';
+import 'package:Meetcha/services/block_service.dart';
+import 'package:Meetcha/services/swipe_service.dart';
+import 'package:Meetcha/widgets/match_dialog.dart';
+import 'package:Meetcha/widgets/profile_card_widget.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -25,8 +25,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool isLoading = true;
   final int dailyLimit = 10;
-
-  final int dailyLimit = 5;
 
   final SwipeService _swipeService = const SwipeService();
 

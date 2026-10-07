@@ -1,6 +1,6 @@
-import 'package:bumble/models/profile_model.dart';
-import 'package:bumble/services/block_service.dart';
-import 'package:bumble/services/match_chat_service.dart';
+import 'package:Meetcha/models/profile_model.dart';
+import 'package:Meetcha/services/block_service.dart';
+import 'package:Meetcha/services/match_chat_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 

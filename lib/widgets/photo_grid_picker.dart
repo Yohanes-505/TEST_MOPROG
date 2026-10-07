@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:bumble/services/profile_service.dart'; 
-import 'package:bumble/constants/app_colors.dart';
+import 'package:Meetcha/services/profile_service.dart'; 
+import 'package:Meetcha/constants/app_colors.dart';
 
 class PhotoGridPicker extends StatefulWidget {
   final String userId;

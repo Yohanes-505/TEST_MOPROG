@@ -1,5 +1,5 @@
-import 'package:bumble/models/profile_model.dart';
-import 'package:bumble/utils/match_expiry.dart';
+import 'package:Meetcha/models/profile_model.dart';
+import 'package:Meetcha/utils/match_expiry.dart';
 
 /// siapa lawan bicaranya + pesan terakhir (kalau sudah ada).
 class MatchPreview {
