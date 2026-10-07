@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
-import 'package:bumble/models/profile_model.dart';
-import 'package:bumble/services/supabase_service.dart';
+import 'package:Meetcha/models/profile_model.dart';
+import 'package:Meetcha/services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 
 /// Semua akses tabel `profiles` + bucket `avatars`.

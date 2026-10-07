@@ -1,8 +1,8 @@
-import 'package:bumble/constants/app_colors.dart';
-import 'package:bumble/models/profile_model.dart';
-import 'package:bumble/services/swipe_service.dart';
-import 'package:bumble/widgets/match_dialog.dart';
-import 'package:bumble/widgets/profile_card_widget.dart';
+import 'package:Meetcha/constants/app_colors.dart';
+import 'package:Meetcha/models/profile_model.dart';
+import 'package:Meetcha/services/swipe_service.dart';
+import 'package:Meetcha/widgets/match_dialog.dart';
+import 'package:Meetcha/widgets/profile_card_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../services/subscription_service.dart';

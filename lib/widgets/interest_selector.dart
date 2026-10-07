@@ -1,5 +1,5 @@
-import 'package:bumble/constants/app_colors.dart';
-import 'package:bumble/constants/interest_options.dart';
+import 'package:Meetcha/constants/app_colors.dart';
+import 'package:Meetcha/constants/interest_options.dart';
 import 'package:flutter/material.dart';
 
 /// Grid chip untuk memilih Interest/Hobby Tags.

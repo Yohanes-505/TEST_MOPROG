@@ -1,9 +1,9 @@
-import 'package:bumble/constants/app_colors.dart';
-import 'package:bumble/models/profile_model.dart';
-import 'package:bumble/models/report_model.dart';
-import 'package:bumble/widgets/block_confirm_dialog.dart';
-import 'package:bumble/widgets/report_bottom_sheet.dart';
-import 'package:bumble/widgets/verified_badge.dart';
+import 'package:Meetcha/constants/app_colors.dart';
+import 'package:Meetcha/models/profile_model.dart';
+import 'package:Meetcha/models/report_model.dart';
+import 'package:Meetcha/widgets/block_confirm_dialog.dart';
+import 'package:Meetcha/widgets/report_bottom_sheet.dart';
+import 'package:Meetcha/widgets/verified_badge.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
