@@ -24,7 +24,6 @@ class _HomeScreenState extends State<HomeScreen> {
   List<ProfileModel> dailyBrew = [];
 
   bool isLoading = true;
-  final int dailyLimit = 10;
 
   final SwipeService _swipeService = const SwipeService();
 
@@ -346,6 +345,29 @@ class _HomeHeader extends StatelessWidget {
               ],
             ),
           ),
+          // Tombol Akses Cepat Gift Shop & Inventory
+          _HeaderButton(
+            icon: Icons.store_rounded,
+            tooltip: 'Gift Shop',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const GiftShopScreen()),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+          _HeaderButton(
+            icon: Icons.inventory_2_rounded,
+            tooltip: 'Inventory Saya',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const UserInventoryScreen()),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
           _HeaderButton(
             icon: Icons.notifications_none_rounded,
             tooltip: 'Match & Pesan',

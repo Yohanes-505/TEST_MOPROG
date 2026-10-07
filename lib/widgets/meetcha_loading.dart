@@ -1,13 +1,3 @@
-// Simpan sebagai: lib/widgets/meetcha_loading.dart
-//
-// Animasi loading: dua kartu profil mengorbit di sepanjang cincin miring,
-// bergantian lewat depan/belakang (efek 3D), sparkle berkedip, dan seluruh
-// grup melayang pelan. Digambar dengan CustomPainter, jadi TIDAK butuh
-// asset gambar/Lottie.
-//
-// Pemakaian:
-//   const MeetchaLoadingScreen()                 // halaman penuh
-//   const MeetchaLoading(size: 160)              // widget kecil (mis. di dialog)
 import 'dart:math' as math;
 
 import 'package:Meetcha/constants/app_colors.dart';
