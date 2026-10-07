@@ -44,17 +44,27 @@ class WelcomeScreen extends StatelessWidget {
                   const Spacer(flex: 2),
 
               SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton(
-                  onPressed: () => Get.to(() => const LoginScreen()),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.brown,
-                    foregroundColor: AppColors.cream,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
+  width: double.infinity,
+  height: 54,
+  child: ElevatedButton(
+    onPressed: () => Get.to(() => const LoginScreen()),
+    style: ElevatedButton.styleFrom(
+      backgroundColor: AppColors.brown,
+      foregroundColor: AppColors.cream,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+    ),
+    child: const Text(
+      'Get Started',
+      style: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  ),
+),
 
                   const SizedBox(height: 14),
 
