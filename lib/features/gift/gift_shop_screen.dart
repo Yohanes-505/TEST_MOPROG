@@ -23,20 +23,20 @@ class _GiftShopScreenState extends State<GiftShopScreen> {
     _fetchData();
   }
 
-  Future<void> _fetchData() async {
+ Future<void> _fetchData() async {
     setState(() => _isLoading = true);
     try {
       final userId = _supabase.auth.currentUser!.id;
 
-      // Ambil saldo dari tabel user_wallets (atau bisa diganti 'wallets' jika itu yang aktif)
+      // Ambil saldo langsung dari tabel 'wallets'
       final walletRes = await _supabase
           .from('wallets')
           .select('balance')
-          .eq('user_id', userId)
+          .eq('user_id', userId) // Kurung tutup dan titik koma sudah diperbaiki dengan benar
           .maybeSingle();
       
-      if (walletRes != null) {
-        _userBalance = walletRes['balance'] ?? 0;
+      if (walletRes != null && walletRes['balance'] != null) {
+        _userBalance = num.tryParse(walletRes['balance'].toString())?.toInt() ?? 0;
       } else {
         _userBalance = 0;
       }
@@ -53,7 +53,10 @@ class _GiftShopScreenState extends State<GiftShopScreen> {
     }
   }
 
-  Future<void> _buyGift(String giftId, int price) async {
+  Future<void> _buyGift(String giftId, dynamic priceDynamic) async {
+    // Konversi harga gift ke int secara aman
+    int price = num.tryParse(priceDynamic.toString())?.toInt() ?? 0;
+
     if (_userBalance < price) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Saldo utama tidak cukup!')),
@@ -61,15 +64,15 @@ class _GiftShopScreenState extends State<GiftShopScreen> {
       return;
     }
 
-    // Panggil fungsi RPC buy_gift
-    final result = await _giftService.buyGift(giftId);
+    final userId = _supabase.auth.currentUser!.id;
+    final result = await _giftService.sendGiftToUser(giftId, userId);
     
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(result['message'])),
     );
 
     if (result['success'] == true) {
-      _fetchData(); // Refresh saldo & UI
+      _fetchData(); // Refresh saldo & UI setelah beli
     }
   }
 
