@@ -9,13 +9,15 @@ import 'package:Meetcha/profile/safe_dating_tips_screen.dart';
 import 'package:Meetcha/screens/subscription_screen.dart';
 import 'package:Meetcha/services/supabase_service.dart';
 import 'package:Meetcha/services/session_timeout_service.dart';
+import 'package:Meetcha/services/notification_service.dart';
 import 'package:Meetcha/verification/face_verification_screen.dart';
 import 'package:Meetcha/verification/face_verification_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-
 final _faceRefresh = 0.obs;
+
 /// Node flowchart: "Tab: Profile".
 /// Berisi ringkasan profil + pintu masuk ke Edit Profil & Foto,
 /// Filter Preferensi, Subscription, dan Safe Dating Tips.
@@ -28,8 +30,10 @@ class ProfileTabScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Profile',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: false,
         actions: [
           IconButton(
@@ -82,7 +86,8 @@ class ProfileTabScreen extends StatelessWidget {
               const SizedBox(height: 12),
               _sectionTitle('Keamanan'),
               Obx(() {
-                final _ = _faceRefresh.value; // memicu rebuild setelah verifikasi
+                final _ =
+                    _faceRefresh.value; // memicu rebuild setelah verifikasi
                 return FutureBuilder<bool>(
                   future: FaceVerificationService.instance.isVerified(),
                   builder: (context, snap) {
@@ -101,7 +106,8 @@ class ProfileTabScreen extends StatelessWidget {
                           ? () {}
                           : () async {
                               final ok = await Get.to<bool>(
-                                  () => const FaceVerificationScreen());
+                                () => const FaceVerificationScreen(),
+                              );
                               if (ok == true) _faceRefresh.value++;
                             },
                     );
@@ -124,8 +130,10 @@ class ProfileTabScreen extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: () => _confirmLogout(context),
                 icon: const Icon(Icons.logout, color: AppColors.error),
-                label: const Text('Keluar',
-                    style: TextStyle(color: AppColors.error)),
+                label: const Text(
+                  'Keluar',
+                  style: TextStyle(color: AppColors.error),
+                ),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(48),
                   side: const BorderSide(color: AppColors.error),
@@ -147,9 +155,10 @@ class ProfileTabScreen extends StatelessWidget {
           backgroundColor: Colors.grey.shade200,
           backgroundImage:
               (profile.photoUrl != null && profile.photoUrl!.startsWith('http'))
-                  ? NetworkImage(profile.photoUrl!)
-                  : null,
-          child: (profile.photoUrl == null ||
+              ? NetworkImage(profile.photoUrl!)
+              : null,
+          child:
+              (profile.photoUrl == null ||
                   !profile.photoUrl!.startsWith('http'))
               ? Icon(Icons.person, size: 48, color: Colors.grey.shade500)
               : null,
@@ -171,33 +180,36 @@ class ProfileTabScreen extends StatelessWidget {
           onTap: () => controller.refreshLocation(),
           borderRadius: BorderRadius.circular(20),
           child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Obx(() => controller.isLocating.value
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        profile.hasLocation
-                            ? Icons.location_on
-                            : Icons.location_off_outlined,
-                        size: 16,
-                        color: profile.hasLocation
-                            ? AppColors.primaryDeep
-                            : AppColors.textSecondary,
-                      )),
+                Obx(
+                  () => controller.isLocating.value
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(
+                          profile.hasLocation
+                              ? Icons.location_on
+                              : Icons.location_off_outlined,
+                          size: 16,
+                          color: profile.hasLocation
+                              ? AppColors.primaryDeep
+                              : AppColors.textSecondary,
+                        ),
+                ),
                 const SizedBox(width: 6),
                 Text(
                   profile.hasLocation
                       ? (profile.city ?? 'Lokasi aktif')
                       : 'Aktifkan lokasi',
                   style: const TextStyle(
-                      fontSize: 13, color: AppColors.textSecondary),
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -218,12 +230,14 @@ class ProfileTabScreen extends StatelessWidget {
             spacing: 6,
             runSpacing: 6,
             children: profile.interests
-                .map<Widget>((i) => Chip(
-                      label: Text(i, style: const TextStyle(fontSize: 12)),
-                      backgroundColor: AppColors.primary.withValues(alpha: 0.2),
-                      side: BorderSide.none,
-                      visualDensity: VisualDensity.compact,
-                    ))
+                .map<Widget>(
+                  (i) => Chip(
+                    label: Text(i, style: const TextStyle(fontSize: 12)),
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.2),
+                    side: BorderSide.none,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                )
                 .toList(),
           ),
         ],
@@ -244,8 +258,10 @@ class ProfileTabScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Kelengkapan profil: $percent%',
-              style: const TextStyle(fontWeight: FontWeight.w600)),
+          Text(
+            'Kelengkapan profil: $percent%',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
           const SizedBox(height: 10),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
@@ -267,16 +283,16 @@ class ProfileTabScreen extends StatelessWidget {
   }
 
   Widget _sectionTitle(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 8, left: 4),
-        child: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textSecondary,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.only(bottom: 8, left: 4),
+    child: Text(
+      text,
+      style: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textSecondary,
+      ),
+    ),
+  );
 
   Widget _menuTile({
     required IconData icon,
@@ -296,8 +312,7 @@ class ProfileTabScreen extends StatelessWidget {
           backgroundColor: AppColors.primary.withValues(alpha: 0.2),
           child: Icon(icon, color: AppColors.ink, size: 20),
         ),
-        title: Text(title,
-            style: const TextStyle(fontWeight: FontWeight.w600)),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
         trailing: const Icon(Icons.chevron_right),
         onTap: onTap,
@@ -318,7 +333,10 @@ class ProfileTabScreen extends StatelessWidget {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Keluar', style: TextStyle(color: AppColors.error)),
+            child: const Text(
+              'Keluar',
+              style: TextStyle(color: AppColors.error),
+            ),
           ),
         ],
       ),
@@ -326,6 +344,9 @@ class ProfileTabScreen extends StatelessWidget {
 
     if (confirmed != true) return;
 
+    if (!kIsWeb) {
+      await deleteCurrentFcmToken();
+    }
     await supabase.auth.signOut();
     await SessionTimeoutService.clear();
     Get.delete<ProfileController>(force: true);

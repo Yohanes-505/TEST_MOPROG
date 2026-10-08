@@ -1,5 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:Meetcha/services/supabase_service.dart';
+import 'package:Meetcha/services/notification_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class SessionTimeoutService {
   // Ubah sesuai kebutuhan
@@ -26,6 +28,9 @@ class SessionTimeoutService {
     final expired = DateTime.now().difference(lastActive) > maxInactive;
 
     if (expired) {
+      if (!kIsWeb) {
+        await deleteCurrentFcmToken();
+      }
       await supabase.auth.signOut();
       await prefs.remove(_key);
     }
